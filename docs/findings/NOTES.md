@@ -72,6 +72,15 @@ Evidence labels: **Observed** (read on a real clock or its backup), **Reported**
   zone (`Etc/GMT+6`, `America/Regina`) avoids stale DST rules in both Android and WebView. **Guess** for the
   clock; same reasoning as the Smart Display's finding.
 
+## Root
+
+- Magisk v31.1 (32-bit, minSdk 24) on the stock OIMK boot image, patched with `LEGACYSAR` (kernel
+  `skip_initramfs` → `want_initramfs`) and `KEEPVERITY`: boots, `magiskd` runs as root, `magisk -v` →
+  `31.1:MAGISK:R`. No fstab in the boot DTB. System untouched; Kiosk Satellite and `sparrow.oem` unaffected.
+  **Observed.**
+- `pm hide` needs `MANAGE_USERS` and `am force-stop` can't stop persistent apps as `shell`: root is what makes
+  those possible. **Observed.**
+
 ## Open
 
 - Mute slider under Kiosk Satellite: untested.

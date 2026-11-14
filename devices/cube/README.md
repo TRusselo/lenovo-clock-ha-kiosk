@@ -190,7 +190,27 @@ adb shell dpm set-device-owner me.jxl.kiosk_satellite/.KioskAdminReceiver
 **Check:** `adb shell dumpsys activity activities | grep mResumedActivity` shows `me.jxl.kiosk_satellite`; the
 light sensor changes brightness and the volume keys change the volume (Lenovo's Things app handles both).
 
+## 13. `root`: Magisk
+
+Optional, but most people expect root. The clock has no userdebug build, so the Smart Display's `adb root` /
+`disable-verity` route doesn't exist here, and **`adb disable-verity` would likely stop it booting** (LK refuses a
+vbmeta with verity flags set). Magisk patches only `boot_a`; system and verity stay untouched.
+
+1. Take a fresh full backup first (step 2's `rf`), now that the clock is set up.
+2. Patch the stock slot-A boot image with Magisk (v31.1 tested), as Magisk's own `boot_patch.sh` does, with
+   `LEGACYSAR=true`, `KEEPVERITY=true`, `KEEPFORCEENCRYPT=true`. The kernel patch matters: LK always passes
+   `skip_initramfs`, and Magisk's hexpatch turns it into `want_initramfs` so the ramdisk with `magiskinit` loads.
+   On a PC, `magiskboot` (Magisk APK, `lib/armeabi-v7a/libmagiskboot.so`) runs under `qemu-arm-static`.
+3. Flash only `boot_a`: start `python fbmulti.py new-boot.img=boot_a`, then enter fastboot. Power-cycle.
+4. `adb install Magisk-v31.1.apk`, then `adb shell su -c id` and tap **Grant** on the clock's screen.
+
+Undo: flash the stock `boot.img` to `boot_a` the same way.
+
+**Check:** `adb shell magisk -v` prints `31.1:MAGISK:R`; `adb shell su -c id` prints `uid=0(root)`; Kiosk Satellite
+is still the home screen; `pidof com.google.android.things.sparrow.oem` prints a number.
+
 ## Restore
 
 - **Back to Alpine or whatever is on slot B:** `python fbmulti.py cmd:set_active:b`, then enter fastboot.
+- **Back to the converted clock before root:** flash the stock slot-A `boot.img` to `boot_a`.
 - **Back to stock exactly as backed up:** write `full_user.bin` back with mtkclient in BROM.
