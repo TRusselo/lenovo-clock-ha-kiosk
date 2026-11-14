@@ -133,17 +133,25 @@ Find the clock: your router's DHCP list, or `nmap -p5555 --open <your-subnet>/24
 
 ## 9. `degoogle`: Cast, Assistant, check-ins
 
+Cast (`mediashell`) and Assistant core are **persistent** apps: `disable-user` alone doesn't stop them, Android
+starts them again at boot, and Cast grew to about 594 MB of the clock's 1 GB, starving WebView until Kiosk
+Satellite was killed. Uninstall Cast for user 0 instead (the APK stays; reversible), and disable the rest:
+
 ```bash
-for p in com.google.android.apps.mediashell com.google.assistant.launcher com.google.assistant.core \
+adb shell pm uninstall -k --user 0 com.google.android.apps.mediashell
+for p in com.google.assistant.launcher com.google.assistant.core \
          com.google.android.things.checkin com.google.android.things.customcheckin; do
   adb shell pm disable-user --user 0 $p
 done
+adb reboot
 ```
 
-**Never disable** `com.google.android.things.sparrow.oem`.
+Undo Cast: `adb shell cmd package install-existing com.google.android.apps.mediashell`.
 
-**Check:** `adb shell pm list packages -d` lists those five; `adb shell pidof com.google.android.things.sparrow.oem`
-prints a number.
+**Never disable** `com.google.android.things.sparrow.oem`: on the clock it drives the light sensor and volume keys.
+
+**Check, after the reboot:** `adb shell pidof com.google.android.apps.mediashell` prints nothing;
+`adb shell pidof com.google.android.things.sparrow.oem` prints a number.
 
 ## 10. `kiosk-install`: Kiosk Satellite
 
@@ -171,12 +179,16 @@ adb shell dpm set-device-owner me.jxl.kiosk_satellite/.KioskAdminReceiver
 ## 12. `kiosk-settings`: setup wizard and settings
 
 1. Go through Kiosk Satellite's setup wizard on the clock or at `http://<clock-ip>:2324`, and press **Finish**.
-2. Set `home.enabled=true` ("Act as the home screen"). Others to try, from the Smart Display: `audio.mic_gain_db`,
-   `audio.mic_capture_mode=voice_communication`, `screen.hide_navigation_bar=false`.
+2. Set `home.enabled=true` ("Act as the home screen"). Without it, Android falls back to the Things launcher.
+3. Turn on Kiosk Satellite's **forced landscape** override: by default it comes up rotated wrong on the clock's
+   portrait panel.
+4. Leave `audio.mic_gain_db` at its default: the clock keeps Google's own mic setup. Raise it only if the wake
+   word misses from across the room.
 
 **Never edit the app's settings file directly**, and never `pm clear` it.
 
-**Check:** to be filled in after the first clock.
+**Check:** `adb shell dumpsys activity activities | grep mResumedActivity` shows `me.jxl.kiosk_satellite`; the
+light sensor changes brightness and the volume keys change the volume (Lenovo's Things app handles both).
 
 ## Restore
 

@@ -57,6 +57,13 @@ Evidence labels: **Observed** (read on a real clock or its backup), **Reported**
 - Disabled with `pm disable-user --user 0`: `com.google.android.apps.mediashell`, `com.google.assistant.launcher`,
   `com.google.assistant.core`, `com.google.android.things.checkin`, `com.google.android.things.customcheckin`.
   `sparrow.oem` kept running afterwards. **Observed.**
+- **Disabled persistent apps still start at boot.** `mediashell` and `assistant.core` came back after a reboot
+  with `enabled=3`, and `am force-stop` can't stop them as `shell`. `mediashell` grew to ~594 MB PSS
+  (Cast preloading app `2DB7CC49` in a loop), leaving ~118 MB; WebView renderers and then Kiosk Satellite were
+  killed. `pm uninstall -k --user 0` works as `shell` (installed=false). `pm hide` needs `MANAGE_USERS`
+  (refused). **Observed.**
+- Light sensor and volume keys work under Kiosk Satellite with `sparrow.oem` running: no bootfix needed.
+  Kiosk Satellite comes up rotated wrong; its forced-landscape setting fixes it. **Observed** (by the person).
 
 ## Time zones
 
@@ -67,6 +74,6 @@ Evidence labels: **Observed** (read on a real clock or its backup), **Reported**
 
 ## Open
 
-- Volume keys, light sensor and mute slider under Kiosk Satellite (Things app still running): untested.
+- Mute slider under Kiosk Satellite: untested.
 - Mic capture for the voice satellite: untested.
 - Whether LK falls back to slot B after three failed slot-A boots: untested.
