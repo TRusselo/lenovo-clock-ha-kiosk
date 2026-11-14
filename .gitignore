@@ -1,0 +1,19 @@
+# images and backups hold per-device keys, Wi-Fi credentials and adb keys: never commit
+backup/
+work/
+cache/
+logs/
+progress/
+build/
+dist/
+*.img
+*.bin
+*.simg
+*_chunk.*
+*.zst
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.superpowers/
+.private-words

@@ -1,0 +1,46 @@
+{
+  "_comment": "Everything the conversion downloads. Nothing here is hosted by this repo. A file whose SHA-256 doesn't match must be deleted and the run stopped. sha256 null = not pinned yet (no verified copy on hand).",
+  "entries": [
+    {
+      "id": "mtkclient",
+      "url": "https://github.com/bkerler/mtkclient/archive/cd25cf9c1ff6d36e82697ac2c798e69e9cfb78c3.zip",
+      "commit": "cd25cf9c1ff6d36e82697ac2c798e69e9cfb78c3",
+      "sha256": null,
+      "note": "kortregt's known-good pin. GPL-3.0. Use natural BROM (Vol+ and Vol- together), kamakiri v1."
+    },
+    {
+      "id": "cube-avb-unlock",
+      "url": "https://s3.us-east-1.wasabisys.com/filestash-buk/lenovo-cube/Cube-AVB-factory-Unlock.zip",
+      "sha256": null,
+      "note": "Contains cube_unlock_credentials_v2.zip (deadman96385)."
+    },
+    {
+      "id": "at_auth_unlock.py",
+      "url": "https://raw.githubusercontent.com/kortregt/lenovo-smart-clock-linux/e03d33f50651cc0766492b8eb89d90a53256d777/at_auth_unlock.py",
+      "sha256": "26042b878c9816d81b710c5aecb555359048857923b4179d1f4cad921ae7dd8b",
+      "size": 19949,
+      "note": "kortregt's Python 3 copy. Repo has no licence file: fetched, not vendored."
+    },
+    {
+      "id": "fbmulti.py",
+      "url": "https://raw.githubusercontent.com/S7ruc7ureV01d/lenovo-smart-clock-lineage/629df7e4d65501ad9f1b9906f8bbb53f55092382/tools/fbmulti.py",
+      "sha256": "11cd7744e8ebdc5d482c49523ac4cb3e61f8818814e99c7bc1827c1c763de19d",
+      "size": 1869,
+      "note": "Sends download+flash straight over USB; LK's fastboot hangs on the stock client's getvar. Needs pyusb. No licence file: fetched, not vendored."
+    },
+    {
+      "id": "sparsesplit.py",
+      "url": "https://raw.githubusercontent.com/S7ruc7ureV01d/lenovo-smart-clock-lineage/629df7e4d65501ad9f1b9906f8bbb53f55092382/tools/sparsesplit.py",
+      "sha256": "4561b06f466c9086ce961f63081a7fc42b5ccf8dbd51258a46a5b88e9c2f5dd3",
+      "size": 2093,
+      "note": "Splits a sparse image into <= 96 MiB pieces (LK's max-download-size)."
+    },
+    {
+      "id": "kiosk-satellite",
+      "url": "https://github.com/jxlarrea/kiosk-satellite/releases/latest",
+      "asset": "*armeabi-v7a.apk",
+      "signing_cert_sha256": "2a77134ce11f65ba9d08bed669fdcb742a25633c5665a6135aeca30040b068fc",
+      "note": "Newest release; check the asset digest from the release API and the signing cert. Tested: 2026.11.19 (sha256 bfaaf0d4949c0a68eec8f35c4dbb4072326f9757ff1dcb47b79d2edb61bcbd3e)."
+    }
+  ]
+}
