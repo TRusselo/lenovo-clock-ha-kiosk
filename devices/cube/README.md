@@ -202,7 +202,13 @@ vbmeta with verity flags set). Magisk patches only `boot_a`; system and verity s
    `skip_initramfs`, and Magisk's hexpatch turns it into `want_initramfs` so the ramdisk with `magiskinit` loads.
    On a PC, `magiskboot` (Magisk APK, `lib/armeabi-v7a/libmagiskboot.so`) runs under `qemu-arm-static`.
 3. Flash only `boot_a`: start `python fbmulti.py new-boot.img=boot_a`, then enter fastboot. Power-cycle.
-4. `adb install Magisk-v31.1.apk`, then `adb shell su -c id` and tap **Grant** on the clock's screen.
+4. `adb install Magisk-v31.1.apk`, then open it (`adb shell monkey -p com.topjohnwu.magisk -c
+   android.intent.category.LAUNCHER 1`). It shows **Requires Additional Setup**: tap OK; the clock reboots. Until
+   then `magiskd` logs "Magisk environment incomplete" and rejects every `su`.
+5. Run `adb shell su -c id` once (it's rejected and logged), open Magisk's **Superuser** tab and switch **Shell**
+   on. Settings had no "Superuser access" item here. Avoid the Modules tab's file picker: it has no way out on the
+   clock's screen (adb `input keyevent KEYCODE_BACK` twice gets out). Close the "patch" popup: boot is already
+   patched.
 
 Undo: flash the stock `boot.img` to `boot_a` the same way.
 
