@@ -41,6 +41,13 @@
       "asset": "*armeabi-v7a.apk",
       "signing_cert_sha256": "2a77134ce11f65ba9d08bed669fdcb742a25633c5665a6135aeca30040b068fc",
       "note": "Newest release; check the asset digest from the release API and the signing cert. Tested: 2026.11.19 (sha256 bfaaf0d4949c0a68eec8f35c4dbb4072326f9757ff1dcb47b79d2edb61bcbd3e)."
+    },
+    {
+      "id": "simple-keyboard",
+      "url": "https://github.com/rkkr/simple-keyboard/releases/download/149/app-release.apk",
+      "sha256": "7914e9aaac823667c601b1143d2da6f221398c41a8bb63f48a9c9d46dce0d0a2",
+      "size": 630327,
+      "note": "On-screen keyboard; the clock's Android Things has none. Apache-2.0."
     }
   ]
 }

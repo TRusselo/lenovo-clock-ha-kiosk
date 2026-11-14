@@ -72,6 +72,11 @@ Evidence labels: **Observed** (read on a real clock or its backup), **Reported**
   zone (`Etc/GMT+6`, `America/Regina`) avoids stale DST rules in both Android and WebView. **Guess** for the
   clock; same reasoning as the Smart Display's finding.
 
+## Keyboard
+
+- Stock clock has no input method (`ime list -a` empty; the Smart Display's Things build ships one). Simple
+  Keyboard 149 installs and `ime enable`/`ime set` work as `shell`. **Observed.**
+
 ## Root
 
 - Magisk v31.1 (32-bit, minSdk 24) on the stock OIMK boot image, patched with `LEGACYSAR` (kernel

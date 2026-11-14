@@ -153,7 +153,22 @@ Undo Cast: `adb shell cmd package install-existing com.google.android.apps.media
 **Check, after the reboot:** `adb shell pidof com.google.android.apps.mediashell` prints nothing;
 `adb shell pidof com.google.android.things.sparrow.oem` prints a number.
 
-## 10. `kiosk-install`: Kiosk Satellite
+## 10. `keyboard`: an on-screen keyboard
+
+The clock's Android Things has **no input method at all**, so text fields on the screen can't be typed into.
+Install [Simple Keyboard](https://github.com/rkkr/simple-keyboard) (tested: release 149, `app-release.apk`,
+sha256 `7914e9aaac823667c601b1143d2da6f221398c41a8bb63f48a9c9d46dce0d0a2`; Java only, about 0.6 MB):
+
+```bash
+adb install -r simple-keyboard-149.apk
+adb shell ime enable rkr.simplekeyboard.inputmethod/.latin.LatinIME
+adb shell ime set rkr.simplekeyboard.inputmethod/.latin.LatinIME
+```
+
+**Check:** `adb shell settings get secure default_input_method` prints
+`rkr.simplekeyboard.inputmethod/.latin.LatinIME`, and tapping a text field shows the keyboard.
+
+## 11. `kiosk-install`: Kiosk Satellite
 
 Download the newest `*armeabi-v7a.apk` from Kiosk Satellite's releases. Check its digest (release API) and its
 signing certificate `2a77134ce11f65ba9d08bed669fdcb742a25633c5665a6135aeca30040b068fc`
@@ -161,7 +176,7 @@ signing certificate `2a77134ce11f65ba9d08bed669fdcb742a25633c5665a6135aeca30040b
 
 **Check:** `adb shell pm path me.jxl.kiosk_satellite` prints a `package:` line.
 
-## 11. `kiosk-grants`: permissions and device owner
+## 12. `kiosk-grants`: permissions and device owner
 
 ```bash
 adb shell appops set me.jxl.kiosk_satellite REQUEST_INSTALL_PACKAGES allow
@@ -176,7 +191,7 @@ adb shell dpm set-device-owner me.jxl.kiosk_satellite/.KioskAdminReceiver
 
 **Check:** `adb shell dumpsys device_policy` shows Kiosk Satellite under `Device Owner`.
 
-## 12. `kiosk-settings`: setup wizard and settings
+## 13. `kiosk-settings`: setup wizard and settings
 
 1. Go through Kiosk Satellite's setup wizard on the clock or at `http://<clock-ip>:2324`, and press **Finish**.
 2. Set `home.enabled=true` ("Act as the home screen"). Without it, Android falls back to the Things launcher.
@@ -190,7 +205,7 @@ adb shell dpm set-device-owner me.jxl.kiosk_satellite/.KioskAdminReceiver
 **Check:** `adb shell dumpsys activity activities | grep mResumedActivity` shows `me.jxl.kiosk_satellite`; the
 light sensor changes brightness and the volume keys change the volume (Lenovo's Things app handles both).
 
-## 13. `root`: Magisk
+## 14. `root`: Magisk
 
 Optional, but most people expect root. The clock has no userdebug build, so the Smart Display's `adb root` /
 `disable-verity` route doesn't exist here, and **`adb disable-verity` would likely stop it booting** (LK refuses a
