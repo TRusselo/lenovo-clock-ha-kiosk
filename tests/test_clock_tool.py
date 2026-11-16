@@ -453,8 +453,9 @@ def test_the_github_token_is_sent_only_when_set(monkeypatch):
     assert kiosk._headers() == {"Authorization": "Bearer t0k"}
 
 
-def test_an_old_address_that_no_longer_answers_is_dropped(tmp_path):
+def test_an_old_address_that_no_longer_answers_is_dropped(tmp_path, monkeypatch):
     import json
+    monkeypatch.setattr(clock.time, "sleep", lambda s: None)
     from lck import system
     from lck.steps import _load
     c = ctx_for(tmp_path, ui=FakeUI([""]), runner=FakeRunner(default=Result(1, "")))
