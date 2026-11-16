@@ -373,30 +373,46 @@ def test_a_clock_adb_already_knows_is_found_without_ip(tmp_path):
     assert not any("HUA05TEST" in c for call in runner.calls for c in call)   # the USB device is never asked
 
 
-def test_degoogle_needs_root_and_hides_cast_with_a_boot_script(tmp_path, monkeypatch):
+def _degoogle_runner(lists, root=True):
     from lck import system
     base = ("-s", "10.0.0.7:5555")
-    no_root = FakeRunner({base + ("get-state",): Result(0, "device\n"),
-                          base + ("shell", "getprop", "ro.product.device"): Result(0, "mt8167s_som\n"),
-                          base + ("shell", "su", "-c", "id"): Result(127, "su: not found\n")})
-    with pytest.raises(clock.SetupFailed, match="needs root"):
-        system.DegoogleStep().run(ctx_for(tmp_path, runner=no_root, ip="10.0.0.7"))
-    lists = [Result(0, f"package:{system.CAST}\npackage:com.google.assistant.core\n"),
-             Result(0, "package:com.google.assistant.core\n")]
-    runner = FakeRunner({base + ("get-state",): Result(0, "device\n"),
-                         base + ("shell", "getprop", "ro.product.device"): Result(0, "mt8167s_som\n"),
-                         base + ("shell", "su", "-c", "id"): Result(0, "uid=0(root)\n"),
-                         base + ("shell", "pm", "list", "packages", "--user", "0"): lists,
-                         base + ("shell", "pm", "list", "packages", "-d", "--user", "0"):
-                             Result(0, "package:com.google.assistant.core\n"),
-                         base + ("shell", "pidof"): Result(0, "123\n")})
-    monkeypatch.setattr(clock, "reboot", lambda ctx, why="": None)
+    return FakeRunner({base + ("get-state",): Result(0, "device\n"),
+                       base + ("shell", "getprop", "ro.product.device"): Result(0, "mt8167s_som\n"),
+                       base + ("shell", "su", "-c", "id"): Result(0, "uid=0(root)\n") if root
+                       else Result(127, "su: not found\n"),
+                       base + ("shell", "pm", "list", "packages", "--user", "0"): lists,
+                       base + ("shell", "pm", "list", "packages", "-d", "--user", "0"):
+                           Result(0, "package:com.google.assistant.core\n"),
+                       base + ("shell", "pidof"): Result(0, "123\n")})
+
+
+def test_degoogle_uses_the_first_clocks_order(tmp_path, monkeypatch):
+    # The first clock: disable-user, restart, uninstall for user 0, restart. Cast stayed off.
+    from lck import system
+    cast = f"package:{system.CAST}\npackage:com.google.assistant.core\n"
+    runner = _degoogle_runner([Result(0, cast), Result(0, cast), Result(0, "package:com.google.assistant.core\n")])
+    reboots = []
+    monkeypatch.setattr(clock, "reboot", lambda ctx, why="": reboots.append(why))
     ui = FakeUI()
     system.DegoogleStep().run(ctx_for(tmp_path, runner=runner, ui=ui, ip="10.0.0.7"))
-    su = [c for c in runner.calls if "su" in c and "-c" in c and "id" not in c]
-    assert any(system.HIDE_SCRIPT in " ".join(c) for c in su)
-    assert not any("uninstall" in c for c in runner.calls)
+    flat = [" ".join(c) for c in runner.calls]
+    first_disable = next(i for i, c in enumerate(flat) if f"disable-user --user 0 {system.CAST}" in c)
+    uninstall = next(i for i, c in enumerate(flat) if f"uninstall -k --user 0 {system.CAST}" in c)
+    assert first_disable < uninstall and len(reboots) == 2
+    assert not any(system.HIDE_SCRIPT in c for c in flat)        # the fallback wasn't needed
     assert any("blank" in l for l in ui.lines)
+
+
+def test_degoogle_falls_back_to_the_boot_script_with_root(tmp_path, monkeypatch):
+    from lck import system
+    cast = f"package:{system.CAST}\n"
+    monkeypatch.setattr(clock, "reboot", lambda ctx, why="": None)
+    runner = _degoogle_runner([Result(0, cast), Result(0, cast), Result(0, cast), Result(0, "")])
+    system.DegoogleStep().run(ctx_for(tmp_path, runner=runner, ip="10.0.0.7"))
+    assert any(system.HIDE_SCRIPT in " ".join(c) for c in runner.calls)
+    runner = _degoogle_runner([Result(0, cast)], root=False)
+    with pytest.raises(clock.SetupFailed, match="needs root"):
+        system.DegoogleStep().run(ctx_for(tmp_path, runner=runner, ip="10.0.0.7"))
     assert "mount -o bind /data/adb/empty-cast /oem/app/com.google.android.apps.mediashell" in system.HIDE_CAST
 
 

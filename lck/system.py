@@ -10,10 +10,10 @@ from lck.steps import Step
 
 CAST = "com.google.android.apps.mediashell"
 # Cast is a persistent app in /oem/app: Android starts it at boot even when disabled, and it
-# grew to about 594 MB of the clock's 1 GB. `pm uninstall --user 0` answers Success, but Android
-# Things installs it again for user 0 at every boot (e2e run 2). What sticks: a Magisk boot
-# script that mounts an empty folder over Cast's app folder before Android looks there. So
-# this step comes after root. Undo: delete the script and the folder, and restart.
+# grew to about 594 MB of the clock's 1 GB. On the first clock, disable-user, a restart, then
+# `pm uninstall -k --user 0` kept it off for good. Uninstalling alone (e2e run 2) didn't: it was
+# back for user 0 after each restart. Fallback, with root: a Magisk boot script that mounts an
+# empty folder over Cast's app folder. Undo: delete the script and the folder, and restart.
 CAST_DIR = "/oem/app/com.google.android.apps.mediashell"
 HIDE_SCRIPT = "/data/adb/post-fs-data.d/hide-cast.sh"
 EMPTY_DIR = "/data/adb/empty-cast"
@@ -137,26 +137,21 @@ class DegoogleStep(Step):
 
     def run(self, ctx) -> None:
         clock.require_clock(ctx)
-        if not clock.has_root(ctx):
-            raise SetupFailed("Hiding Cast needs root, and adb doesn't have it. Run the root step first: "
-                              "lck setup --from root")
         installed = _packages(ctx)
+        # The order that kept Cast off on the first clock, through every restart after it:
+        # disable-user first, restart, then uninstall for user 0, restart. Uninstalling alone
+        # (e2e run 2) didn't last: Cast was back for user 0 after each restart.
         with ctx.ui.busy("Switching off Google's apps"):
-            for p in DISABLE:
+            for p in [CAST, *DISABLE]:
                 if p in installed:
                     shell(ctx, "pm", "disable-user", "--user", "0", p, check=False)
-            if CAST in installed:
-                local = ctx.paths.root / "work" / "hide-cast.sh"
-                local.parent.mkdir(parents=True, exist_ok=True)
-                local.write_text(HIDE_CAST, encoding="utf-8")
-                clock.adb(ctx, "push", local, "/data/local/tmp/hide-cast.sh", timeout=60)
-                shell(ctx, "su", "-c", f"mkdir -p {HIDE_SCRIPT.rsplit('/', 1)[0]} {EMPTY_DIR} && "
-                                       f"cp /data/local/tmp/hide-cast.sh {HIDE_SCRIPT} && chmod 755 {HIDE_SCRIPT} "
-                                       f"&& rm /data/local/tmp/hide-cast.sh", timeout=60)
-        clock.reboot(ctx, why="the clock to restart without them")
+        clock.reboot(ctx, why="the clock to restart with them switched off")
         if CAST in _packages(ctx):
-            raise SetupFailed(f"Cast came back after the restart: the boot script at {HIDE_SCRIPT} didn't hide "
-                              "it. Please report this, with the log.")
+            with ctx.ui.busy("Removing Cast for this user"):
+                shell(ctx, "pm", "uninstall", "-k", "--user", "0", CAST, check=False)
+            clock.reboot(ctx, why="the clock to restart without Cast")
+        if CAST in _packages(ctx):
+            self._hide_cast(ctx)
         back = [p for p in DISABLE if p in _packages(ctx) and p not in _packages(ctx, "-d")]
         if back:
             raise SetupFailed(f"{', '.join(back)} came back on after the restart. Please report this, with "
@@ -166,6 +161,27 @@ class DegoogleStep(Step):
         if not shell(ctx, "pidof", THINGS_APP, check=False).strip():
             ctx.ui.say("Note: Lenovo's Things app (volume keys, light sensor) isn't running yet. It usually "
                        "starts within a minute.")
+
+
+    @staticmethod
+    def _hide_cast(ctx) -> None:
+        """Fallback, with root: a Magisk boot script mounts an empty folder over Cast's app folder
+        before Android looks there (tested in e2e run 2: Cast neither listed nor running)."""
+        if not clock.has_root(ctx):
+            raise SetupFailed("Cast came back after the restart, and hiding it needs root, which adb doesn't "
+                              "have. Run the root step, then this one: lck setup --from root")
+        local = ctx.paths.root / "work" / "hide-cast.sh"
+        local.parent.mkdir(parents=True, exist_ok=True)
+        local.write_text(HIDE_CAST, encoding="utf-8")
+        with ctx.ui.busy("Cast came back: hiding it with a boot script"):
+            clock.adb(ctx, "push", local, "/data/local/tmp/hide-cast.sh", timeout=60)
+            shell(ctx, "su", "-c", f"mkdir -p {HIDE_SCRIPT.rsplit('/', 1)[0]} {EMPTY_DIR} && "
+                                   f"cp /data/local/tmp/hide-cast.sh {HIDE_SCRIPT} && chmod 755 {HIDE_SCRIPT} "
+                                   f"&& rm /data/local/tmp/hide-cast.sh", timeout=60)
+        clock.reboot(ctx, why="the clock to restart with Cast hidden")
+        if CAST in _packages(ctx):
+            raise SetupFailed(f"Cast came back after the restart, even with the boot script at {HIDE_SCRIPT}. "
+                              "Please report this, with the log.")
 
 
 class KeyboardStep(Step):

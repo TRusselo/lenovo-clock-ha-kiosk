@@ -5,8 +5,9 @@ What changed for people converting a clock. Newest first.
 ## Unreleased
 
 ### Fixes from the second end-to-end run
-- **Cast stays off.** Removing it for user 0 only lasted until the next restart: Android Things put it back at
-  every boot. Root now comes before switching Google off, and Cast is hidden with a Magisk boot script.
+- **Cast stays off.** Removing it for user 0 on its own only lasted until the next restart. The step now does what
+  kept it off on the first clock: disable it, restart, then remove it for user 0, and restart. If it still comes
+  back, a Magisk boot script hides it; root now comes before this step so that fallback is there.
 - **After a flash, the replug box stays on screen** until the clock has left fastboot, instead of being replaced
   at once by the address question.
 - **The address question says where to find it on the clock** (Settings, About device), and why the rest is over

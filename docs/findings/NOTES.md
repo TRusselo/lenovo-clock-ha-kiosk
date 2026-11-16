@@ -64,13 +64,18 @@ Evidence labels: **Observed** (read on a real clock or its backup), **Reported**
   (Cast preloading app `2DB7CC49` in a loop), leaving ~118 MB; WebView renderers and then Kiosk Satellite were
   killed. `pm uninstall -k --user 0` works as `shell` (installed=false). `pm hide` needs `MANAGE_USERS`
   (refused). **Observed.**
-- **Correction (e2e run 2, 2026-11-16): the user-0 uninstall of Cast doesn't last.** It answers `Success`, but
-  after every restart Cast is installed for user 0 again (`installed=true`, read before and after two
-  restarts); the earlier observation was read before a restart. Android Things seems to reinstall the `/oem` apps
+- **Correction (e2e run 2, 2026-11-16): the user-0 uninstall of Cast alone doesn't last.** It answers `Success`,
+  but after every restart Cast is installed for user 0 again (`installed=true`, read before and after two
+  restarts). **The order seems to matter:** on the first clock Cast was `disable-user`'d first (04:17), the clock
+  restarted, then it was uninstalled for user 0 (05:00), and it stayed gone through every restart after
+  (`cast-gone` at 06:23, after the Magisk flashes). **Observed** on one clock each; why the order matters is a
+  **Guess** (perhaps Android Things puts back only apps that aren't disabled). The tool now does it in the first
+  clock's order. Android Things seems to reinstall the `/oem` apps
   for user 0 at boot (**Guess**: the log doesn't say why). `pm disable` as root doesn't stop it either
   (persistent: started at boot anyway). **What works, observed:** a Magisk `post-fs-data.d` script that
   bind-mounts an empty folder over `/oem/app/com.google.android.apps.mediashell`. After a restart Cast isn't
-  listed or running, `sparrow.oem` runs, about 257 MB RAM free. So root comes before the degoogle step.
+  listed or running, `sparrow.oem` runs, about 257 MB RAM free. The tool uses it as a fallback, so root comes
+  before the degoogle step.
 - Light sensor and volume keys work under Kiosk Satellite with `sparrow.oem` running: no bootfix needed.
   Kiosk Satellite comes up rotated wrong; its forced-landscape setting fixes it. **Observed** (by the person).
 
