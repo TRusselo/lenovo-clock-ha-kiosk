@@ -1,39 +1,92 @@
 {
-  "_comment": "Everything the conversion downloads. Nothing here is hosted by this repo. A file whose SHA-256 doesn't match must be deleted and the run stopped. sha256 null = not pinned yet (no verified copy on hand).",
+  "_comment": "Everything the tool downloads at run time. Nothing here is hosted by this repo. A file whose SHA-256 doesn't match is deleted and the run stops. kiosk-satellite is the newest release, checked against its published digest and signing certificate.",
   "entries": [
+    {
+      "id": "platform-tools-linux",
+      "url": "https://dl.google.com/android/repository/platform-tools_r36.0.0-linux.zip",
+      "sha256": "0ead642c943ffe79701fccca8f5f1c69c4ce4f43df2eefee553f6ccb27cbfbe8",
+      "size": 7904253,
+      "unpack": "zip",
+      "platform": "linux"
+    },
+    {
+      "id": "uv-linux-x86_64",
+      "url": "https://github.com/astral-sh/uv/releases/download/0.11.7/uv-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "6681d691eb7f9c00ac6a3af54252f7ab29ae72f0c8f95bdc7f9d1401c23ea868",
+      "size": 24249861,
+      "unpack": "tar.gz",
+      "platform": "linux-x86_64"
+    },
+    {
+      "id": "uv-linux-aarch64",
+      "url": "https://github.com/astral-sh/uv/releases/download/0.11.7/uv-aarch64-unknown-linux-gnu.tar.gz",
+      "sha256": "f2ee1cde9aabb4c6e43bd3f341dadaf42189a54e001e521346dc31547310e284",
+      "size": 22739428,
+      "unpack": "tar.gz",
+      "platform": "linux-aarch64"
+    },
     {
       "id": "mtkclient",
       "url": "https://github.com/bkerler/mtkclient/archive/cd25cf9c1ff6d36e82697ac2c798e69e9cfb78c3.zip",
-      "commit": "cd25cf9c1ff6d36e82697ac2c798e69e9cfb78c3",
-      "sha256": null,
-      "note": "kortregt's known-good pin. GPL-3.0. Use natural BROM (Vol+ and Vol- together), kamakiri v1."
+      "sha256": "90af12d45023f7d8e2161910910351e2e9f2ab555401484e6f86f44fff0a21b2",
+      "size": 32332016,
+      "unpack": "zip",
+      "platform": null,
+      "note": "kortregt's known-good pin. GPL-3.0, run through uv, never bundled. Natural BROM (VOLUME UP and VOLUME DOWN together), kamakiri v1."
     },
     {
       "id": "cube-avb-unlock",
       "url": "https://s3.us-east-1.wasabisys.com/filestash-buk/lenovo-cube/Cube-AVB-factory-Unlock.zip",
-      "sha256": null,
-      "note": "Contains cube_unlock_credentials_v2.zip (deadman96385)."
+      "sha256": "37454a42e689bd5cfa8c5c759aa2f5a052af1abc3505e29e5c93786027a3198f",
+      "size": 5370378,
+      "unpack": "zip",
+      "platform": null,
+      "note": "Holds cube_unlock_credentials_v2.zip (deadman96385). Only the credentials are used."
     },
     {
       "id": "at_auth_unlock.py",
       "url": "https://raw.githubusercontent.com/kortregt/lenovo-smart-clock-linux/e03d33f50651cc0766492b8eb89d90a53256d777/at_auth_unlock.py",
       "sha256": "26042b878c9816d81b710c5aecb555359048857923b4179d1f4cad921ae7dd8b",
       "size": 19949,
-      "note": "kortregt's Python 3 copy. Repo has no licence file: fetched, not vendored."
+      "note": "kortregt's Python 3 copy. Repo has no licence file: fetched, not vendored.",
+      "unpack": null,
+      "platform": null
     },
     {
       "id": "fbmulti.py",
       "url": "https://raw.githubusercontent.com/S7ruc7ureV01d/lenovo-smart-clock-lineage/629df7e4d65501ad9f1b9906f8bbb53f55092382/tools/fbmulti.py",
       "sha256": "11cd7744e8ebdc5d482c49523ac4cb3e61f8818814e99c7bc1827c1c763de19d",
       "size": 1869,
-      "note": "Sends download+flash straight over USB; LK's fastboot hangs on the stock client's getvar. Needs pyusb. No licence file: fetched, not vendored."
+      "note": "Sends download+flash straight over USB; LK's fastboot hangs on the stock client's getvar. Needs pyusb. No licence file: fetched, not vendored.",
+      "unpack": null,
+      "platform": null
     },
     {
       "id": "sparsesplit.py",
       "url": "https://raw.githubusercontent.com/S7ruc7ureV01d/lenovo-smart-clock-lineage/629df7e4d65501ad9f1b9906f8bbb53f55092382/tools/sparsesplit.py",
       "sha256": "4561b06f466c9086ce961f63081a7fc42b5ccf8dbd51258a46a5b88e9c2f5dd3",
       "size": 2093,
-      "note": "Splits a sparse image into <= 96 MiB pieces (LK's max-download-size)."
+      "note": "Splits a sparse image into <= 96 MiB pieces (LK's max-download-size).",
+      "unpack": null,
+      "platform": null
+    },
+    {
+      "id": "magisk",
+      "url": "https://github.com/topjohnwu/Magisk/releases/download/v31.1/Magisk-v31.1.apk",
+      "sha256": "89cefac0a318afa39fb3880c45c87b036c05bc1ebf02a7a715b7f8d7c26ac6e7",
+      "size": 10679283,
+      "unpack": null,
+      "platform": null,
+      "note": "Magisk v31.1 (GPL-3.0), tested on the clock. The patch runs on the clock itself, as the Magisk app does."
+    },
+    {
+      "id": "simple-keyboard",
+      "url": "https://github.com/rkkr/simple-keyboard/releases/download/149/app-release.apk",
+      "sha256": "7914e9aaac823667c601b1143d2da6f221398c41a8bb63f48a9c9d46dce0d0a2",
+      "size": 630327,
+      "note": "On-screen keyboard; the clock's Android Things has none. Apache-2.0.",
+      "unpack": null,
+      "platform": null
     },
     {
       "id": "kiosk-satellite",
@@ -41,13 +94,6 @@
       "asset": "*armeabi-v7a.apk",
       "signing_cert_sha256": "2a77134ce11f65ba9d08bed669fdcb742a25633c5665a6135aeca30040b068fc",
       "note": "Newest release; check the asset digest from the release API and the signing cert. Tested: 2026.11.19 (sha256 bfaaf0d4949c0a68eec8f35c4dbb4072326f9757ff1dcb47b79d2edb61bcbd3e)."
-    },
-    {
-      "id": "simple-keyboard",
-      "url": "https://github.com/rkkr/simple-keyboard/releases/download/149/app-release.apk",
-      "sha256": "7914e9aaac823667c601b1143d2da6f221398c41a8bb63f48a9c9d46dce0d0a2",
-      "size": 630327,
-      "note": "On-screen keyboard; the clock's Android Things has none. Apache-2.0."
     }
   ]
 }

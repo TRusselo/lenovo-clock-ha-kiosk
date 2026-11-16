@@ -17,3 +17,6 @@ __pycache__/
 .pytest_cache/
 .superpowers/
 .private-words
+
+# dashboard reference copied from a live install: holds real entity ids and room names
+dashboard/reference/

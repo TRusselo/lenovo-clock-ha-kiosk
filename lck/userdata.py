@@ -20,6 +20,11 @@ import subprocess
 import sys
 import tempfile
 
+
+class UserdataFailed(Exception):
+    pass
+
+
 PROP_CTX = "u:object_r:property_data_file:s0"
 SYS_CTX = "u:object_r:system_data_file:s0"
 ADBKEY_CTX = "u:object_r:adb_keys_file:s0"
@@ -33,7 +38,7 @@ def dbg(img, cmds):
     os.unlink(path)
     err = [l for l in r.stderr.splitlines() if l and not l.startswith("debugfs ")]
     if err:
-        raise SystemExit("debugfs: " + "\n".join(err))
+        raise UserdataFailed("debugfs: " + "\n".join(err))
     return r.stdout
 
 
@@ -60,14 +65,18 @@ def put(img, tmp, path, data, uid, gid, mode, ctx):
     ])
 
 
-def inject(img: str, pub: str) -> None:
+def inject(img: str, pub: str, runner=None) -> None:
+    """Edits img in place. Every debugfs call is a plain subprocess: its output holds
+    the Wi-Fi settings file, so none of it goes to the run log."""
     key = open(pub, "rb").read()
-    assert key.startswith(b"QAAAA"), "expected an adbkey.pub (public key)"
+    if not key.startswith(b"QAAAA"):
+        raise UserdataFailed(f"{pub} isn't an adb public key (adbkey.pub).")
     with tempfile.TemporaryDirectory() as tmp:
         sg = cat(img, "/system/users/0/settings_global.xml").decode()
-        new, n = re.subn(r'(name="adb_enabled" value=")0(")', r"\g<1>1\2", sg)
+        new, n = re.subn(r'(name="adb_enabled" value=")[01](")', r"\g<1>1\2", sg)
         if n != 1:
-            raise SystemExit("adb_enabled setting not found exactly once")
+            raise UserdataFailed("The user data has no adb_enabled setting (or more than one): it isn't "
+                                 "from a stock clock that has been set up.")
         put(img, tmp, "/system/users/0/settings_global.xml", new.encode(), 1000, 1000, 0o600, SYS_CTX)
         put(img, tmp, "/property/persist.adb.tcp.port", b"5555", 0, 0, 0o600, PROP_CTX)
         put(img, tmp, "/property/persist.sys.usb.config", b"adb", 0, 0, 0o600, PROP_CTX)
@@ -75,7 +84,9 @@ def inject(img: str, pub: str) -> None:
         # (adb_enabled back to 0) and ask for a wipe before we can disable it over adb.
         put(img, tmp, "/property/persist.sys.disable_rescue", b"true", 0, 0, 0o600, PROP_CTX)
         put(img, tmp, "/misc/adb/adb_keys", key, 1000, 2000, 0o640, ADBKEY_CTX)
-    print("injected: adb_enabled=1, persist.adb.tcp.port=5555, persist.sys.usb.config=adb, persist.sys.disable_rescue=true, adb_keys")
+    if runner is None:
+        print("injected: adb_enabled=1, persist.adb.tcp.port=5555, persist.sys.usb.config=adb, "
+              "persist.sys.disable_rescue=true, adb_keys")
 
 
 def main() -> None:

@@ -1,82 +1,101 @@
 # Lenovo Smart Clock gen 1 (CD-24501F, "cube"): manual steps
 
-The steps that converted the first clock, in order. Each step says what to do and **how to check it worked**:
-don't go on until the check passes. There's no guided tool yet; these steps are what it will run.
+These are the same steps `lck setup` runs, in the same order. Each step says what to do and **how to check it
+worked**: don't go on until the check passes. The guided tool does all of this for you; use this page if you'd
+rather do it by hand, or if you're an AI agent following along.
 
 > [!CAUTION]
-> This unlocks verified boot and rewrites partitions. **You need a full eMMC backup taken before unlocking**
-> (step 2): unlocking wipes userdata, and step 5 rebuilds it from that backup. A clock that was unlocked without
-> a userdata backup isn't supported yet.
+> This unlocks verified boot and rewrites partitions. **You need a full backup taken before unlocking**
+> (step 2): unlocking wipes the clock's user data, and step 5 rebuilds it from that backup. A clock that was
+> unlocked without a backup isn't supported.
 
 **Conventions:**
 - Commands run on a Linux computer, in a terminal, from this repo's folder. `adb` and `fastboot` are Google's
-  platform-tools. Third-party tools are pinned in [`manifest.json`](../../manifest.json).
-- **Power:** the clock runs on its barrel jack, not USB. With USB alone the chip stays off.
-- **Cable:** USB **A-to-A**, straight-through.
-- **Modes** (the screen stays dark in all of them; unplug the barrel power, hold the buttons, plug in):
-  - **fastboot:** hold **Vol+**, keep holding 20 to 30 seconds. USB ID `0bb4:0c01`.
-  - **BROM:** hold **Vol+ and Vol− together**, about 5 seconds. `0e8d:0003` (it can take a few tries). Vol− alone
-    gives the preloader, `0e8d:2000`, which mtkclient handles badly: power-cycle and try BROM again.
-  - One mtkclient command per BROM power-cycle.
-- **LK's fastboot hangs** on the `getvar` queries the stock `fastboot` client sends. Start the command first,
-  then enter fastboot: `fbmulti.py` waits up to 5 minutes for the clock.
-- **Never write** the preloader, `lk_*`, `tee_*`, `oem_bootloader_*`, `seccfg`, `proinfo`, `nvram` or the GPT.
+  [platform-tools](https://developer.android.com/tools/releases/platform-tools). Third-party tools are pinned in
+  [`manifest.json`](../../manifest.json).
+- **Power:** the clock runs on its round barrel plug, not USB. With USB alone the chip stays off.
+- **Cable:** USB **A-to-A**, straight-through (no chip in the middle), into the clock's USB port.
+- **Modes.** The screen stays **dark** in all of them. Unplug the barrel power, hold the button(s), plug the power
+  in. Find the mode from the USB device list (`lsusb`):
+  - **fastboot:** hold **VOLUME UP**, keep holding 20 to 30 seconds. `0bb4:0c01`.
+  - **BROM:** hold **VOLUME UP and VOLUME DOWN together**, about 5 seconds. `0e8d:0003`. It often takes two or
+    three tries. One button alone gives the preloader, `0e8d:2000`, which mtkclient handles badly on this clock:
+    unplug and try again.
+  - One mtkclient command per BROM power-cycle. Several commands go in one with `mtk.py multi "a;b"`.
+  - The clock never shows up as adb on USB: under Android its port is host-only. adb runs over Wi-Fi.
+- **LK's fastboot hangs** on the `getvar` queries the stock `fastboot` client sends before a flash. Flash with
+  `fbmulti.py`, and start it first, then enter fastboot: it waits up to 5 minutes for the clock.
+- **Never write** the preloader, `lk_*`, `tee_*`, `oem_bootloader_*`, `seccfg`, `proinfo`, `nvram`, `kb`,
+  `dkb` or the GPT. `oem_bootloader` is LK's device-tree table: anything else there hangs the clock in the
+  preloader.
 
-## 1. `prerequisites`: tools and space
+## 1. `prerequisites`: this computer and the tools
 
-- About **15 GB free**, `e2fsprogs` (`debugfs`, `e2fsck`), `img2simg`, `zstd`, `nmap`, platform-tools.
-- A Python venv with `pyusb` for mtkclient and `fbmulti.py` (manifest: `mtkclient`, `fbmulti.py`,
-  `sparsesplit.py`).
+- About **20 GB free**, `e2fsprogs` (`debugfs`, `e2fsck`), `img2simg` (`android-sdk-libsparse-utils` on Debian and
+  Ubuntu, `android-tools` on Arch and Fedora), `zstd` and libusb-1.0.
+- USB access without root: [docs/LINUX.md](../../docs/LINUX.md), step 3.
+- Download and check: platform-tools, [uv](https://github.com/astral-sh/uv), mtkclient, the AVB unlock zip,
+  `at_auth_unlock.py`, `fbmulti.py`, `sparsesplit.py`, Simple Keyboard, Magisk and Kiosk Satellite.
+- mtkclient runs with `uv run --python 3.12 --with pyusb --with pycryptodome --with pycryptodomex --with colorama
+  --with pyserial --with keystone-engine --with capstone --with unicorn python mtk.py ...` (its own
+  `requirements.txt` pulls in a GUI you don't need).
 
-**Check:** `debugfs -V`, `img2simg` (prints usage), `adb version`, `venv/bin/python -c 'import usb'`.
+**Check:** `debugfs -V`, `img2simg` (prints usage), `zstd -V`, `adb version`.
 
-## 2. `backup`: full eMMC backup, before unlocking
+## 2. `backup`: the whole clock, before unlocking
 
-In BROM, from the mtkclient folder (one command per power-cycle):
+In BROM, from a new folder, in one session:
 
 ```bash
-python mtk.py printgpt > backup/gpt.txt
-python mtk.py rf backup/full_user.bin          # whole user area, about 30 to 40 minutes
-python mtk.py r preloader backup/boot1.bin --parttype boot1
-python mtk.py r preloader backup/boot2.bin --parttype boot2
-zstd -T0 -10 --long=27 backup/full_user.bin -o backup/full_user.bin.zst
+python mtk.py multi "rf full_user.bin;r preloader boot1.bin --parttype boot1;r preloader boot2.bin --parttype boot2"
 ```
 
-The full image is what matters: it includes **userdata**. kortregt's `split_dump.py` skips userdata unless you
-pass `--include-userdata`.
+The whole user area (every partition, **userdata included**) takes about 40 minutes. Then:
 
-**Check:** `gpt.txt` lists 31 partitions ending in `userdata`; `zstd -t --long=27` passes; keep SHA-256 sums.
-**Keep the backup private.** It holds per-device keys and your Wi-Fi password.
+```bash
+head -c 17408 full_user.bin > gpt.bin
+sha256sum full_user.bin > SHA256SUMS
+zstd -T0 -10 --long=27 full_user.bin -o full_user.bin.zst && zstd -t --long=27 full_user.bin.zst
+sha256sum full_user.bin.zst gpt.bin boot1.bin boot2.bin >> SHA256SUMS
+rm full_user.bin
+```
 
-## 3. `unlock`: bootloader and AVB
+`lck backup` does the same at any time, for example before trying something new.
+
+**Check:** `gpt.bin` holds 29 partitions ending in `userdata`; `zstd -t` passes. **Keep the backup private.**
+It holds the clock's own keys and your Wi-Fi password.
+
+## 3. `unlock`: bootloader and verified boot
 
 In fastboot:
 
 ```bash
 fastboot flashing unlock
-python at_auth_unlock.py -v cube_unlock_credentials_v2.zip
+python at_auth_unlock.py -v cube_unlock_credentials_v2.zip     # from Cube-AVB-factory-Unlock.zip
 ```
 
 **Check:** `fastboot getvar unlocked` is `yes`; `getvar at-vboot-state` shows `avb-locked: 0`
-(`bootloader-locked: 1` stays, that's normal).
+(`bootloader-locked: 1` stays, that's normal). Unlocking wiped userdata.
 
 ## 4. `images`: the stock slot set
 
-Split the backup into partitions (kortregt's `tools/split_dump.py`, with `--include-userdata`). Pick the stock
-slot whose build matches the backup's userdata: read `ro.build.id` from each `system_*.bin`, and the
-fingerprint in userdata's `system/packages.xml`. On the first clock that was slot B, `OIMK.211005.001`.
+Split the backup into partitions with its own partition table. Pick the stock slot whose build matches the
+backup's userdata: `ro.build.id` from each slot's system (`debugfs -R "cat /system/build.prop" system_a.bin`),
+and the fingerprint in userdata's `/system/packages.xml` (after `e2fsck -fy` on a copy). On the first clock that
+was slot B, `OIMK.211005.001`.
 
-From that slot: `boot`, `vendor`, `vbmeta`, `system`, `oem`. Make sparse pieces of the big ones:
+From that slot: `boot`, `vendor`, `vbmeta`, `system`, `oem`. Keep the stock `boot` as `boot-stock.img`: it's the
+undo for step 14. Make sparse pieces of the big ones:
 
 ```bash
 img2simg system_b.bin system.simg && python sparsesplit.py system.simg system_chunk 94371840
 img2simg oem_b.bin oem.simg       && python sparsesplit.py oem.simg oem_chunk 94371840
 ```
 
-**Check:** each source matches the backup's SHA-256, and
-`python -m lck.sparse backup/gpt.txt system_a system_chunk.*` (and `oem_a`) print OK.
+**Check:** each piece's sparse header declares no more than its partition's size
+(`python -m lck.sparse gpt.txt system_a system_chunk.*`, with mtkclient's `printgpt` output).
 
-## 5. `userdata`: provision adb over Wi-Fi offline
+## 5. `userdata`: switch on adb over Wi-Fi, offline
 
 ```bash
 cp --sparse=always userdata.bin userdata_things.img
@@ -87,11 +106,10 @@ e2fsck -fn userdata_things.img
 img2simg userdata_things.img userdata.simg && python sparsesplit.py userdata.simg userdata_chunk 94371840
 ```
 
-This switches on adb over Wi-Fi with your key, and switches off RescueParty. The clock reconnects to the Wi-Fi
-saved in the backup; if that network is gone, it has no network and no adb.
+This switches on adb over Wi-Fi with your computer's key, and switches off RescueParty. The clock reconnects to
+the Wi-Fi saved in the backup; if that network is gone, it has no network and no adb.
 
-**Check:** `e2fsck -fn` is clean; `python -m lck.sparse backup/gpt.txt userdata userdata_chunk.*` prints OK.
-`userdata_things.img` holds your Wi-Fi password: don't share it.
+**Check:** `e2fsck -fn` is clean. `userdata_things.img` holds your Wi-Fi password: don't share it.
 
 ## 6. `misc`: boot slot A, block updates
 
@@ -116,20 +134,20 @@ python fbmulti.py boot.img=boot_a vendor.img=vendor_a vbmeta.img=vbmeta_a \
   misc.img=misc
 ```
 
-`misc` goes last: if anything before it fails, the clock still boots slot B.
+`misc` goes last: if anything before it fails, the clock still starts slot B.
 
-**Check:** `ALL DONE`, about 4 minutes. Then unplug and replug the power with no buttons held. The first boot
+**Check:** `ALL DONE`, about 4 minutes. Then unplug and replug the power with no buttons held. The first start
 takes a few minutes.
 
 ## 8. `connect`: adb over Wi-Fi
 
-Find the clock: your router's DHCP list, or `nmap -p5555 --open <your-subnet>/24` and then
-`adb connect <clock-ip>:5555`, `adb shell getprop ro.product.device` → `mt8167s_som`.
+Find the clock's address in your router's list of devices (it may show as "Android"), then
+`adb connect <clock-ip>:5555`. Always pass `-s <clock-ip>:5555`, so nothing else connected is touched.
 
 **Check:**
-- `adb shell getprop ro.boot.slot_suffix` → `_a`
-- `adb shell update_engine_client --show_channel` → `none-channel`
-- `adb logcat -d -s update_engine | grep "Marking booted slot as good"` finds a line
+- `adb -s <clock-ip>:5555 shell getprop ro.product.device` → `mt8167s_som`
+- `... getprop ro.boot.slot_suffix` → `_a`
+- `... update_engine_client --show_channel` → `none-channel`
 
 ## 9. `degoogle`: Cast, Assistant, check-ins
 
@@ -150,14 +168,13 @@ Undo Cast: `adb shell cmd package install-existing com.google.android.apps.media
 
 **Never disable** `com.google.android.things.sparrow.oem`: on the clock it drives the light sensor and volume keys.
 
-**Check, after the reboot:** `adb shell pidof com.google.android.apps.mediashell` prints nothing;
+**Check, after the restart:** `adb shell pidof com.google.android.apps.mediashell` prints nothing;
 `adb shell pidof com.google.android.things.sparrow.oem` prints a number.
 
 ## 10. `keyboard`: an on-screen keyboard
 
 The clock's Android Things has **no input method at all**, so text fields on the screen can't be typed into.
-Install [Simple Keyboard](https://github.com/rkkr/simple-keyboard) (tested: release 149, `app-release.apk`,
-sha256 `7914e9aaac823667c601b1143d2da6f221398c41a8bb63f48a9c9d46dce0d0a2`; Java only, about 0.6 MB):
+Install [Simple Keyboard](https://github.com/rkkr/simple-keyboard) (release 149, pinned in the manifest):
 
 ```bash
 adb install -r simple-keyboard-149.apk
@@ -166,7 +183,7 @@ adb shell ime set rkr.simplekeyboard.inputmethod/.latin.LatinIME
 ```
 
 **Check:** `adb shell settings get secure default_input_method` prints
-`rkr.simplekeyboard.inputmethod/.latin.LatinIME`, and tapping a text field shows the keyboard.
+`rkr.simplekeyboard.inputmethod/.latin.LatinIME`.
 
 ## 11. `kiosk-install`: Kiosk Satellite
 
@@ -194,44 +211,49 @@ adb shell dpm set-device-owner me.jxl.kiosk_satellite/.KioskAdminReceiver
 ## 13. `kiosk-settings`: setup wizard and settings
 
 1. Go through Kiosk Satellite's setup wizard on the clock or at `http://<clock-ip>:2324`, and press **Finish**.
-2. Set `home.enabled=true` ("Act as the home screen"). Without it, Android falls back to the Things launcher.
-3. Turn on Kiosk Satellite's **forced landscape** override: by default it comes up rotated wrong on the clock's
-   portrait panel.
-4. Leave `audio.mic_gain_db` at its default: the clock keeps Google's own mic setup. Raise it only if the wake
-   word misses from across the room.
+2. Turn on "Act as the home screen" (`home.enabled`). Without it, Android falls back to the Things launcher.
+3. Turn on Kiosk Satellite's **forced landscape** override if it comes up sideways on the clock's portrait panel.
+4. Leave the mic gain at its default: the clock keeps Google's own mic setup.
 
 **Never edit the app's settings file directly**, and never `pm clear` it.
 
-**Check:** `adb shell dumpsys activity activities | grep mResumedActivity` shows `me.jxl.kiosk_satellite`; the
-light sensor changes brightness and the volume keys change the volume (Lenovo's Things app handles both).
+**Check:** `adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c
+android.intent.category.HOME` ends with `me.jxl.kiosk_satellite/...`; the light sensor changes brightness and the
+volume keys change the volume (Lenovo's Things app handles both).
 
 ## 14. `root`: Magisk
 
-Optional, but most people expect root. The clock has no userdebug build, so the Smart Display's `adb root` /
-`disable-verity` route doesn't exist here, and **`adb disable-verity` would likely stop it booting** (LK refuses a
-vbmeta with verity flags set). Magisk patches only `boot_a`; system and verity stay untouched.
+Most people expect root. The clock has no userdebug build, so the Smart Display's `adb root` route doesn't exist
+here, and **`adb disable-verity` would likely stop it starting** (LK refuses a vbmeta with verity flags set).
+Magisk patches only `boot_a`; system and verity stay untouched.
 
-1. Take a fresh full backup first (step 2's `rf`), now that the clock is set up.
-2. Patch the stock slot-A boot image with Magisk (v31.1 tested), as Magisk's own `boot_patch.sh` does, with
-   `LEGACYSAR=true`, `KEEPVERITY=true`, `KEEPFORCEENCRYPT=true`. The kernel patch matters: LK always passes
-   `skip_initramfs`, and Magisk's hexpatch turns it into `want_initramfs` so the ramdisk with `magiskinit` loads.
-   On a PC, `magiskboot` (Magisk APK, `lib/armeabi-v7a/libmagiskboot.so`) runs under `qemu-arm-static`.
-3. Flash only `boot_a`: start `python fbmulti.py new-boot.img=boot_a`, then enter fastboot. Power-cycle.
-4. `adb install Magisk-v31.1.apk`, then open it (`adb shell monkey -p com.topjohnwu.magisk -c
-   android.intent.category.LAUNCHER 1`). It shows **Requires Additional Setup**: tap OK; the clock reboots. Until
-   then `magiskd` logs "Magisk environment incomplete" and rejects every `su`.
-5. Run `adb shell su -c id` once (it's rejected and logged), open Magisk's **Superuser** tab and switch **Shell**
-   on. Settings had no "Superuser access" item here. Avoid the Modules tab's file picker: it has no way out on the
-   clock's screen (adb `input keyevent KEYCODE_BACK` twice gets out). Close the "patch" popup: boot is already
-   patched.
-
-Undo: flash the stock `boot.img` to `boot_a` the same way.
+1. Patch the stock boot image (`boot-stock.img` from step 4) **on the clock**, as the Magisk app does: push
+   Magisk v31.1's `assets/boot_patch.sh`, `assets/util_functions.sh` and its `lib/armeabi-v7a/` binaries
+   (`libmagiskboot.so` as `magiskboot`, and so on, plus an empty `stub.apk`) to `/data/local/tmp/lck-magisk`,
+   then run `KEEPVERITY=true KEEPFORCEENCRYPT=true LEGACYSAR=true sh boot_patch.sh boot.img` there and pull
+   `new-boot.img`. `LEGACYSAR` matters: LK always passes `skip_initramfs`, and Magisk's kernel patch turns it into
+   `want_initramfs` so its ramdisk loads.
+2. Flash only `boot_a`: start `python fbmulti.py new-boot.img=boot_a`, then enter fastboot. Power-cycle.
+3. `adb install Magisk-v31.1.apk`, then open it. It shows **Requires Additional Setup**: tap OK; the clock
+   restarts. Until then `magiskd` rejects every `su`.
+4. Run `adb shell su -c id` once (it's rejected and logged), open Magisk's **Superuser** tab and switch **Shell**
+   on. Avoid the Modules tab's file picker: it has no way out on the clock's screen (`adb shell input keyevent
+   KEYCODE_BACK` twice gets out). Close the "patch" popup: boot is already patched.
 
 **Check:** `adb shell magisk -v` prints `31.1:MAGISK:R`; `adb shell su -c id` prints `uid=0(root)`; Kiosk Satellite
 is still the home screen; `pidof com.google.android.things.sparrow.oem` prints a number.
 
+## 15. `verify`: final check
+
+**Check:** slot `_a`, channel `none-channel`, Kiosk Satellite is device owner, Cast isn't running and Lenovo's
+Things app is.
+
 ## Restore
 
-- **Back to Alpine or whatever is on slot B:** `python fbmulti.py cmd:set_active:b`, then enter fastboot.
-- **Back to the converted clock before root:** flash the stock slot-A `boot.img` to `boot_a`.
-- **Back to stock exactly as backed up:** write `full_user.bin` back with mtkclient in BROM.
+- **A backup, back on its own clock:** `lck restore backup/clock.zip`. It reads the clock's partition table in
+  BROM first and stops unless the disk GUID and layout match the backup. Then, in BROM again, it writes `boot`,
+  `vbmeta`, `vendor`, `system` and `oem` on both slots, `misc`, `frp`, `metadata` and `userdata`. It never writes
+  the bootloader chain or the clock's keys and calibration. The bootloader stays unlocked.
+- **Back to the converted clock before root:** flash `boot-stock.img` to `boot_a` with `fbmulti.py`.
+- **Back to whatever is on slot B (Alpine, for example):** `python fbmulti.py cmd:set_active:b`, then enter
+  fastboot.

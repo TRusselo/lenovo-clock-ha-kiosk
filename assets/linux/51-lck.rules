@@ -1,0 +1,6 @@
+# Lenovo Smart Clock (gen 1) in its USB modes, for lck without root.
+# MediaTek BROM, preloader and download agent (mtkclient), and LK's fastboot.
+SUBSYSTEM=="usb", ATTR{idVendor}=="0e8d", ATTR{idProduct}=="0003", MODE="0666", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0e8d", ATTR{idProduct}=="2000", MODE="0666", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0e8d", ATTR{idProduct}=="2001", MODE="0666", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0bb4", ATTR{idProduct}=="0c01", MODE="0666", TAG+="uaccess"
