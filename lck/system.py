@@ -153,15 +153,22 @@ class DegoogleStep(Step):
     def run(self, ctx) -> None:
         clock.require_clock(ctx)
         installed = _packages(ctx)
-        # The order that kept Cast off on the first clock, through every restart after it:
-        # disable-user first, restart, then uninstall for user 0, restart. Uninstalling alone
-        # (e2e run 2) didn't last: Cast was back for user 0 after each restart.
+        # Disable first, then uninstall for user 0: uninstalling alone (e2e run 2) didn't last, Cast
+        # was back for user 0 after each restart. On the first clock, disable, a restart, then the
+        # uninstall kept it off. Whether that restart in the middle matters isn't known yet, so it's
+        # tried without it first, and with it only if Cast comes back.
         with ctx.ui.busy("Switching off Google's apps"):
             for p in [CAST, *DISABLE]:
                 if p in installed:
                     shell(ctx, "pm", "disable-user", "--user", "0", p, check=False)
+            if CAST in installed:
+                shell(ctx, "pm", "uninstall", "-k", "--user", "0", CAST, check=False)
         clock.reboot(ctx, why="the clock to restart with them switched off")
         if CAST in _packages(ctx):
+            ctx.ui.say("Cast came back after the restart. Trying the first clock's way: switch it off, restart, "
+                       "then remove it.")
+            shell(ctx, "pm", "disable-user", "--user", "0", CAST, check=False)
+            clock.reboot(ctx, why="the clock to restart with Cast switched off")
             with ctx.ui.busy("Removing Cast for this user"):
                 shell(ctx, "pm", "uninstall", "-k", "--user", "0", CAST, check=False)
             clock.reboot(ctx, why="the clock to restart without Cast")

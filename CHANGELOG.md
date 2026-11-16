@@ -5,9 +5,10 @@ What changed for people converting a clock. Newest first.
 ## Unreleased
 
 ### Fixes from the second end-to-end run
-- **Cast stays off.** Removing it for user 0 on its own only lasted until the next restart. The step now does what
-  kept it off on the first clock: disable it, restart, then remove it for user 0, and restart. If it still comes
-  back, a Magisk boot script hides it; root now comes before this step so that fallback is there.
+- **Cast stays off.** Removing it for user 0 on its own only lasted until the next restart. The step now disables it
+  before removing it for user 0, as on the first clock where it stayed off. If it comes back, it tries the first
+  clock's exact order (with a restart in the middle), then a Magisk boot script; root now comes before this step
+  so that last fallback is there.
 - **After a flash, the replug box stays on screen** until the clock has left fastboot, instead of being replaced
   at once by the address question.
 - **The address question says where to find it on the clock** (Settings, About device), and why the rest is over

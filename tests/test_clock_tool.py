@@ -386,11 +386,11 @@ def _degoogle_runner(lists, root=True):
                        base + ("shell", "pidof"): Result(0, "123\n")})
 
 
-def test_degoogle_uses_the_first_clocks_order(tmp_path, monkeypatch):
-    # The first clock: disable-user, restart, uninstall for user 0, restart. Cast stayed off.
+def test_degoogle_disables_before_it_uninstalls(tmp_path, monkeypatch):
+    # Uninstalling alone didn't last (e2e run 2); disable first, then uninstall, did (first clock).
     from lck import system
     cast = f"package:{system.CAST}\npackage:com.google.assistant.core\n"
-    runner = _degoogle_runner([Result(0, cast), Result(0, cast), Result(0, "package:com.google.assistant.core\n")])
+    runner = _degoogle_runner([Result(0, cast), Result(0, "package:com.google.assistant.core\n")])
     reboots = []
     monkeypatch.setattr(clock, "reboot", lambda ctx, why="": reboots.append(why))
     ui = FakeUI()
@@ -398,9 +398,21 @@ def test_degoogle_uses_the_first_clocks_order(tmp_path, monkeypatch):
     flat = [" ".join(c) for c in runner.calls]
     first_disable = next(i for i, c in enumerate(flat) if f"disable-user --user 0 {system.CAST}" in c)
     uninstall = next(i for i, c in enumerate(flat) if f"uninstall -k --user 0 {system.CAST}" in c)
-    assert first_disable < uninstall and len(reboots) == 2
+    assert first_disable < uninstall and len(reboots) == 1
     assert not any(system.HIDE_SCRIPT in c for c in flat)        # the fallback wasn't needed
     assert any("blank" in l for l in ui.lines)
+
+
+def test_degoogle_tries_the_first_clocks_restart_if_cast_comes_back(tmp_path, monkeypatch):
+    from lck import system
+    cast = f"package:{system.CAST}\n"
+    runner = _degoogle_runner([Result(0, cast), Result(0, cast), Result(0, "")])
+    reboots = []
+    monkeypatch.setattr(clock, "reboot", lambda ctx, why="": reboots.append(why))
+    ui = FakeUI()
+    system.DegoogleStep().run(ctx_for(tmp_path, runner=runner, ui=ui, ip="10.0.0.7"))
+    assert len(reboots) == 3 and any("first clock's way" in l for l in ui.lines)
+    assert not any(system.HIDE_SCRIPT in " ".join(c) for c in runner.calls)
 
 
 def test_degoogle_falls_back_to_the_boot_script_with_root(tmp_path, monkeypatch):

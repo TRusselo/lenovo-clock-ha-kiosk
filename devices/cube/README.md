@@ -186,11 +186,13 @@ for p in com.google.android.apps.mediashell com.google.assistant.launcher com.go
          com.google.android.things.checkin com.google.android.things.customcheckin; do
   adb shell pm disable-user --user 0 $p
 done
-adb reboot
-# once it's back:
 adb shell pm uninstall -k --user 0 com.google.android.apps.mediashell
 adb reboot
 ```
+
+If Cast is listed again after that restart (`pm list packages com.google.android.apps.mediashell`), do it the
+first clock's way, with a restart in the middle: `disable-user` Cast, `adb reboot`, then the uninstall, and
+`adb reboot` again. Whether that middle restart matters isn't known yet.
 
 Undo Cast: `adb shell cmd package install-existing com.google.android.apps.mediashell`, then
 `adb shell pm enable com.google.android.apps.mediashell`.
