@@ -145,7 +145,7 @@ BROM_PROMPT = ("Unplug the clock's round power plug. Hold VOLUME UP and VOLUME D
                "power back in, and keep holding for about 5 seconds, then let go. The screen stays dark. "
                "It often takes two or three tries.")
 FASTBOOT_PROMPT = ("Unplug the clock's round power plug. Hold VOLUME UP, plug the power back in, and keep "
-                   "holding for 20 to 30 seconds, until the tool says it found the clock. The screen "
+                   "holding for about 10 seconds, until the tool says it found the clock. The screen "
                    "stays dark in this mode.")
 POWER_CYCLE = ("Unplug the clock's round power plug, wait 3 seconds, and plug it back in. Hold no buttons. "
                "It starts normally: the first start takes a few minutes.")
