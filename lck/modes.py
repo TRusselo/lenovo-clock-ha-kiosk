@@ -152,8 +152,8 @@ FASTBOOT_PROMPT = ("For fastboot mode: unplug the clock's round power plug. Hold
                    "hold is normal, so keep holding. The screen stays dark.")
 POWER_CYCLE = ("To start the clock normally: Unplug the clock's round power plug, wait 3 seconds, and plug it "
                "back in. Hold no buttons. The first start takes a few minutes.")
-IN_A_MODE = ("The clock is still in {mode} mode, with its screen dark. To start it normally, Unplug its round "
-             "power plug and plug it back in, holding no buttons.")
+IN_A_MODE = ("The clock is still in {mode} mode, with its screen dark. To start the clock normally: Unplug "
+             "its round power plug and plug it back in, holding no buttons.")
 
 
 def wait_to_leave(ctx, mode: Mode, *, sleep=time.sleep) -> None:

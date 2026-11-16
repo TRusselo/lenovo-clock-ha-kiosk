@@ -175,7 +175,8 @@ def overall(log: Path, weights: list[int]):
         text = log.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
-    finished = min(len(re.findall(r"^(?:Wrote|Dumped) ", text.replace("\r", "\n"), re.M)), len(weights))
+    # mtkclient prints "Wrote parts/boot_a.bin to sector …" once a partition is written.
+    finished = min(len(re.findall(r"(?:^|\s)(?:Wrote|Dumped) \S", text.replace("\r", "\n"))), len(weights))
     pct = _last_percent(log) if finished < len(weights) else 100.0
     total = sum(weights) or 1
     return 100 * (sum(weights[:finished]) + (weights[finished] * (pct or 0) / 100

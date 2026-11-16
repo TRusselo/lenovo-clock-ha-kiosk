@@ -153,6 +153,9 @@ def _setup(args) -> int:
             found = None
         if found:
             ctx.state["ip"] = found
+        else:
+            from lck.system import check_saved_ip
+            check_saved_ip(ctx)
     if fresh and not args.dry_run and args.start_from is None:
         ctx.ui.intro(_intro(ctx))
     run_steps(plan.setup_steps(), ctx, start_from=args.start_from, restart=args.restart)

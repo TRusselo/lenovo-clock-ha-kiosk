@@ -1,6 +1,8 @@
 """Over adb on Wi-Fi: find the clock, switch Google off (after root), add a keyboard."""
 from __future__ import annotations
 
+import json
+
 from lck import clock
 from lck.clock import SetupFailed, shell
 from lck.downloads import fetch
@@ -50,6 +52,35 @@ def ask_ip(ctx) -> None:
         ctx.ui.say(f'"{answer}" isn\'t an address. It looks like four numbers with dots between them.')
 
 
+def check_saved_ip(ctx) -> None:
+    """E2E run 2: the clock's address changed between runs. An address from an earlier run is
+    used only if a clock still answers there; otherwise ask once, before any step sends the
+    person to fastboot for nothing."""
+    f = ctx.paths.progress / f"{ctx.state.get('progress_id')}.json"
+    try:
+        saved = json.loads(f.read_text(encoding="utf-8")).get("ip")
+    except (OSError, ValueError):
+        return
+    if not saved:
+        return
+    ctx.state["ip"] = saved
+    if clock.is_clock(ctx):
+        return
+    ctx.ui.say(f"No clock answers at {saved}, its address on the last run. If the clock is running "
+               "Android now (its own screen, not dark), its address may have changed.")
+    ctx.ui.physical(WHERE_IP)
+    while True:
+        answer = ctx.ui.ask("Type its address, or press Enter if it isn't running Android (stock, off, or "
+                            "dark in BROM or fastboot): ").strip()
+        if not answer:
+            ctx.state["ip"] = None
+            return
+        if clock.valid_ip(answer):
+            ctx.state["ip"] = answer
+            return
+        ctx.ui.say(f'"{answer}" isn\'t an address. It looks like four numbers with dots between them.')
+
+
 class ConnectStep(Step):
     name = "connect"
     title = "Find the clock on Wi-Fi and check it started slot A"
@@ -61,11 +92,17 @@ class ConnectStep(Step):
         if not ctx.state.get("ip"):
             ask_ip(ctx)
         while not clock.connect(ctx):
-            ctx.ui.say(f"No clock answers at {ctx.state['ip']} yet. The first start takes a few minutes; "
-                       "the screen shows the clock face when it's ready.")
-            clock.wait_booted(ctx, timeout=300)
-            if not clock.connect(ctx):
-                ctx.state.pop("ip")
+            ctx.ui.say(f"No clock answers at {ctx.state['ip']} yet. The first start takes a few minutes; the "
+                       "screen shows the clock face when it's ready. Its address can also change after a flash.")
+            ctx.ui.physical(WHERE_IP)
+            answer = ctx.ui.ask("Type its address if it's different, or press Enter to keep waiting: ").strip()
+            if clock.valid_ip(answer):
+                ctx.state["ip"] = answer
+                continue
+            try:
+                clock.wait_booted(ctx, timeout=300)
+            except SetupFailed:
+                ctx.state["ip"] = None
                 ask_ip(ctx)
         clock.require_clock(ctx)
         clock.wait_booted(ctx)

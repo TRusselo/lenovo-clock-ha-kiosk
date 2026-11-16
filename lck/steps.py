@@ -79,7 +79,7 @@ def _load(ctx: Context) -> list[str]:
     if not f.exists():
         return []
     data = json.loads(f.read_text(encoding="utf-8"))
-    if data.get("ip") and not ctx.state.get("ip"):
+    if data.get("ip") and "ip" not in ctx.state:
         # The clock's Wi-Fi address, from the connect step (--ip overrides it).
         ctx.state["ip"] = data["ip"]
     if data.get("serial"):

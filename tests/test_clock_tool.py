@@ -353,7 +353,10 @@ def test_a_silent_fastboot_never_counts_as_locked(tmp_path):
 
 def test_one_bar_for_the_whole_restore(tmp_path):
     log = tmp_path / "mtk.txt"
-    log.write_text("Wrote a.bin to sector 1\nProgress: 50.0% Write\n")
+    # Real mtkclient output from run 2's restore (\r between progress redraws).
+    log.write_text("Done |\u2588---------| 6.2% Write: (0x200000/0x2000000),0.00 MB/s\r"
+                   "Wrote parts/boot_a.bin to sector 134184 with sector count 65536.\n"
+                   "Progress: |\u2588\u2588---| 50.0% Write: (0x400000/0x2000000), 20.11 MB/s 01s left \r")
     assert mtk.overall(log, [10, 10, 80]) == pytest.approx(15.0)
     log.write_text("Wrote a\nWrote b\nWrote c\n")
     assert mtk.overall(log, [10, 10, 80]) == pytest.approx(100.0)
@@ -448,3 +451,19 @@ def test_the_github_token_is_sent_only_when_set(monkeypatch):
     assert kiosk._headers() == {}
     monkeypatch.setenv("GITHUB_TOKEN", "t0k")
     assert kiosk._headers() == {"Authorization": "Bearer t0k"}
+
+
+def test_an_old_address_that_no_longer_answers_is_dropped(tmp_path):
+    import json
+    from lck import system
+    from lck.steps import _load
+    c = ctx_for(tmp_path, ui=FakeUI([""]), runner=FakeRunner(default=Result(1, "")))
+    c.paths.progress.mkdir(parents=True)
+    (c.paths.progress / "clock.json").write_text(json.dumps({"done": ["prerequisites"], "ip": "10.0.0.5"}))
+    system.check_saved_ip(c)
+    assert c.state["ip"] is None
+    _load(c)
+    assert c.state["ip"] is None            # the saved one isn't put back
+    c2 = ctx_for(tmp_path, ui=FakeUI(["10.0.0.8"]), runner=FakeRunner(default=Result(1, "")))
+    system.check_saved_ip(c2)
+    assert c2.state["ip"] == "10.0.0.8"
