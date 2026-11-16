@@ -81,6 +81,9 @@ reach it there.
 
 ## If the clock doesn't come back
 
+The clock's address can change whenever it restarts. When it's slow to answer, the tool asks whether it has, so you
+can type the new one and carry on. It never relies on an address from an earlier run without checking it.
+
 After the flash, the first start takes a few minutes, and the clock joins the Wi-Fi saved in the backup. If the
 tool can't reach it:
 

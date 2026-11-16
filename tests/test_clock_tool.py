@@ -484,3 +484,20 @@ def test_an_old_address_that_no_longer_answers_is_dropped(tmp_path, monkeypatch)
     c2 = ctx_for(tmp_path, ui=FakeUI(["10.0.0.8"]), runner=FakeRunner(default=Result(1, "")))
     system.check_saved_ip(c2)
     assert c2.state["ip"] == "10.0.0.8"
+
+
+def test_a_new_address_after_a_restart_is_asked_for_and_used(tmp_path, monkeypatch):
+    # The address can change at any restart, not just between runs.
+    clocks = iter([0, 0, 300, 300, 300, 300, 300, 300])
+    monkeypatch.setattr(clock.time, "monotonic", lambda: next(clocks, 300))
+    seen = []
+
+    def booted(ctx):
+        seen.append(ctx.state["ip"])
+        return ctx.state["ip"] == "10.0.0.8"
+    monkeypatch.setattr(clock, "booted", booted)
+    ui = FakeUI(["10.0.0.8"])
+    c = ctx_for(tmp_path, ui=ui, ip="10.0.0.5")
+    clock.wait_booted(c, sleep=lambda s: None)
+    assert c.state["ip"] == "10.0.0.8" and "10.0.0.5" in seen
+    assert any("may have changed" in l for l in ui.lines)

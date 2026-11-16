@@ -112,19 +112,32 @@ def booted(ctx) -> bool:
         return False
 
 
-def wait_booted(ctx, timeout=600, why="the clock to start", sleep=time.sleep) -> None:
-    """Wait until Android has finished starting and adb over Wi-Fi answers. Silent when it has."""
+def wait_booted(ctx, timeout=600, why="the clock to start", sleep=time.sleep, ask_after=240) -> None:
+    """Wait until Android has finished starting and adb over Wi-Fi answers. Silent when it has.
+    The clock's address can change at any restart: after `ask_after` seconds with no answer,
+    the person is asked whether it has, and the wait goes on at the new one."""
     if booted(ctx):
         return
-    end = time.monotonic() + timeout
-    with ctx.ui.busy(f"Waiting for {why}"):
-        while not booted(ctx):
-            if time.monotonic() > end:
-                raise SetupFailed(f"The clock didn't come back on Wi-Fi at {ctx.state.get('ip')} within "
-                                  f"{timeout // 60} minutes. If its screen shows the clock face, check its "
-                                  "address in your router, then run the same command with --ip. More help: "
-                                  + doc("docs/GUIDE.md", "If the clock doesn't come back"))
-            sleep(3)
+    start = time.monotonic()
+    asked = False
+    while True:
+        with ctx.ui.busy(f"Waiting for {why}"):
+            while not booted(ctx):
+                waited = time.monotonic() - start
+                if waited > timeout:
+                    raise SetupFailed(f"The clock didn't come back on Wi-Fi at {ctx.state.get('ip')} within "
+                                      f"{timeout // 60} minutes. If its screen shows the clock face, find its "
+                                      "address on it (Settings, About device), then run the same command with "
+                                      "--ip and that address. More help: "
+                                      + doc("docs/GUIDE.md", "If the clock doesn't come back"))
+                if not asked and waited > ask_after:
+                    break
+                sleep(3)
+            else:
+                return
+        asked = True
+        from lck.system import ask_if_ip_changed
+        ask_if_ip_changed(ctx)
 
 
 def boot_id(ctx) -> str:

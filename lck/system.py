@@ -52,6 +52,21 @@ def ask_ip(ctx) -> None:
         ctx.ui.say(f'"{answer}" isn\'t an address. It looks like four numbers with dots between them.')
 
 
+def ask_if_ip_changed(ctx) -> None:
+    """The clock is slow to answer after a restart: its address may have changed."""
+    ctx.ui.say(f"No answer from the clock at {ctx.state.get('ip')} yet. If its screen shows the clock face or "
+               "Kiosk Satellite, its address may have changed.")
+    ctx.ui.physical(WHERE_IP)
+    while True:
+        answer = ctx.ui.ask("Type its new address, or press Enter to keep waiting: ").strip()
+        if not answer:
+            return
+        if clock.valid_ip(answer):
+            ctx.state["ip"] = answer
+            return
+        ctx.ui.say(f'"{answer}" isn\'t an address. It looks like four numbers with dots between them.')
+
+
 def check_saved_ip(ctx) -> None:
     """E2E run 2: the clock's address changed between runs. An address from an earlier run is
     used only if a clock still answers there; otherwise ask once, before any step sends the
