@@ -78,9 +78,10 @@ def prop(ctx, name: str) -> str:
 
 
 def is_clock(ctx) -> bool:
-    """Reachable over Wi-Fi and really a gen-1 Smart Clock. Never raises."""
+    """Reachable over Wi-Fi and really a gen-1 Smart Clock. Never raises. Three tries:
+    adb over Wi-Fi often says offline for a moment right after connecting."""
     try:
-        return connect(ctx, tries=1) and prop(ctx, "ro.product.device") == DEVICE
+        return connect(ctx, tries=3) and prop(ctx, "ro.product.device") == DEVICE
     except Exception:
         return False
 

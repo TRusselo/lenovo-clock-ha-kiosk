@@ -28,6 +28,7 @@ RAW = "full_user.bin"
 ZST = "full_user.bin.zst"
 GPT_FILE = "gpt.bin"
 BOOT_AREAS = ["boot1.bin", "boot2.bin"]
+BOOT_AREA_SIZE = 0x400000
 SUMS = "SHA256SUMS"
 CHUNK = 4 << 20
 # What restore writes. The rest of the disk (bootloader chain, keys, calibration,
@@ -102,15 +103,18 @@ def backup(ctx, out: Path) -> None:
     if not verify_backup(out):
         ctx.ui.keep(f"There's already a complete backup in {out}.")
         return
-    (out / RAW).unlink(missing_ok=True)
-    mtk.run_in_brom(ctx, [f"rf {RAW}", "r preloader boot1.bin --parttype boot1",
-                          "r preloader boot2.bin --parttype boot2"],
-                    cwd=out, title="Backing up the clock: the whole disk, about 40 minutes")
     raw = out / RAW
+    if not _complete_dump(out):
+        # A dump that came out whole is kept if a later step fails: redoing it costs 40
+        # minutes at the clock.
+        raw.unlink(missing_ok=True)
+        mtk.run_in_brom(ctx, [f"rf {RAW}", "r preloader boot1.bin --parttype boot1",
+                              "r preloader boot2.bin --parttype boot2"],
+                        cwd=out, title="Backing up the clock: the whole disk, about 40 minutes")
+        if not _complete_dump(out):
+            raise BackupMismatch("The backup came out incomplete (the disk image is short, or a boot area "
+                                 "is missing). Run the same command again to redo it.")
     head = open(raw, "rb").read(gpt.GPT_BYTES)
-    parts = gpt.read_gpt(head)
-    if raw.stat().st_size < parts[-1].offset + parts[-1].size:
-        raise BackupMismatch("The backup came out shorter than the clock's disk. Run again to redo it.")
     (out / GPT_FILE).write_bytes(head)
     with ctx.ui.busy("Checking the backup"):
         sums = {RAW: sha256(raw)}
@@ -124,6 +128,18 @@ def backup(ctx, out: Path) -> None:
     (out / "mtk-output.txt").unlink(missing_ok=True)
     ctx.ui.keep(f"Backup complete: {out}. Keep it private: it holds data unique to this clock, and its "
                 "Wi-Fi password.")
+
+
+def _complete_dump(out: Path) -> bool:
+    raw = Path(out) / RAW
+    try:
+        parts = gpt.read_gpt(open(raw, "rb").read(gpt.GPT_BYTES))
+    except (OSError, ValueError):
+        return False
+    if raw.stat().st_size < parts[-1].offset + parts[-1].size:
+        return False
+    return all((Path(out) / n).exists() and (Path(out) / n).stat().st_size == BOOT_AREA_SIZE
+               for n in BOOT_AREAS)
 
 
 def extract(ctx, folder: Path, names: list[str], dest: Path) -> dict[str, Path]:

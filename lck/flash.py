@@ -23,9 +23,13 @@ from lck.images import work
 from lck.modes import FASTBOOT_PROMPT, POWER_CYCLE, Mode, current, wait_for_mode
 from lck.runner import Result
 from lck.steps import Step
+from lck.ui import choose
 from lck.uvrun import uv_path, uv_python
 
 FLASH_SET = {"boot_a", "vendor_a", "vbmeta_a", "system_a", "oem_a", "userdata", "misc"}
+WIPE_WARNING = ("This clock was already unlocked before this run, so it may already be converted. Flashing "
+                "replaces slot A and its user data with the images built from the backup: Kiosk Satellite, "
+                "root and everything set up since go.")
 
 
 class FlashFailed(Exception):
@@ -113,6 +117,10 @@ class FlashStep(Step):
 
     def run(self, ctx) -> None:
         pairs = flash_list(work(ctx) / "images")
+        if not ctx.state.get("unlocked_now"):
+            ctx.ui.say("WARNING: " + WIPE_WARNING)
+            if not choose(ctx.ui, "Type flash to flash it anyway, or press Enter to stop: ", "flash"):
+                raise FlashFailed("Stopped before flashing. Nothing was changed.")
         fbmulti(ctx, pairs, title="Flashing slot A, about 4 minutes")
         ctx.ui.physical(POWER_CYCLE)
         ctx.ui.say("It reconnects to the Wi-Fi saved in the backup, with adb over Wi-Fi switched on.")
@@ -132,10 +140,14 @@ def _fastboot(ctx, *args, timeout=60, check=False):
 
 
 def unlocked(ctx) -> tuple[bool, bool]:
-    """(bootloader unlocked, AVB unlocked), from fastboot."""
-    bl = _value(_fastboot(ctx, "getvar", "unlocked", timeout=30).out, "unlocked") == "yes"
-    avb = _value(_fastboot(ctx, "getvar", "at-vboot-state", timeout=30).out, "avb-locked") == "0"
-    return bl, avb
+    """(bootloader unlocked, AVB unlocked), from fastboot. No answer stops the run:
+    guessing "locked" would unlock a clock that may already be converted."""
+    bl = _value(_fastboot(ctx, "getvar", "unlocked", timeout=30).out, "unlocked")
+    avb = _value(_fastboot(ctx, "getvar", "at-vboot-state", timeout=30).out, "avb-locked")
+    if bl not in ("yes", "no") or avb not in ("0", "1"):
+        raise FlashFailed("The clock's fastboot didn't say whether it's unlocked. Nothing was changed. Unplug "
+                          "its power and run the same command again.")
+    return bl == "yes", avb == "0"
 
 
 class UnlockStep(Step):
@@ -151,6 +163,7 @@ class UnlockStep(Step):
         if bl and avb:
             ctx.ui.say("The bootloader and verified boot are already unlocked.")
             return
+        ctx.state["unlocked_now"] = True
         if not bl:
             with ctx.ui.busy("Unlocking the bootloader"):
                 _fastboot(ctx, "flashing", "unlock", timeout=120)

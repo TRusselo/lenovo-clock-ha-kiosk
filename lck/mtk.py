@@ -15,12 +15,13 @@ import time
 from pathlib import Path
 
 from lck.downloads import fetch
-from lck.modes import BROM_PROMPT, PRELOADER_HINT, Mode, current
+from lck.modes import BROM_PROMPT, HINT_AFTER, NOTHING_HINT, PRELOADER_HINT, Mode, UsbNoPermission, current
 from lck.uvrun import uv_path, uv_python
 
 PACKAGES = ["pyusb", "pycryptodome", "pycryptodomex", "colorama", "pyserial", "keystone-engine",
             "capstone", "unicorn"]
 TRIES = 5
+REPROMPT_AFTER = 180
 # Commands that write to the clock. Anything else mtkclient can do (writing the whole
 # disk, the preloader, erasing, unlocking seccfg) is refused here.
 READS = {"rf", "ro", "r", "printgpt"}
@@ -91,7 +92,7 @@ def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str 
         proc = ctx.runner.spawn(args, out_file=log, cwd=cwd)
         try:
             ctx.ui.physical(prompt)
-            text = _follow(ctx, proc, log, title, sleep, timeout, commands)
+            text = _follow(ctx, proc, log, title, sleep, timeout, commands, prompt)
         except MtkFailed:
             text = ""
         except BaseException:
@@ -111,13 +112,18 @@ def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str 
     raise AssertionError("unreachable")
 
 
-def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands) -> str:
+def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, prompt: str) -> str:
     start = time.monotonic()
     last = None
-    hinted = False
+    hinted = nothing_hinted = False
+    reprompts = 1
     while proc.poll() is None:
         try:
             mode = current(ctx)
+        except UsbNoPermission:
+            proc.kill()
+            ctx.runner.finished(proc)
+            raise
         except Exception:
             mode = None
         if mode is not None and mode.value != last:
@@ -130,7 +136,16 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands) -
             break
         if mode == Mode.DA:
             break
-        if time.monotonic() - start > timeout:
+        waited = time.monotonic() - start
+        if mode == Mode.NONE and not nothing_hinted and waited > HINT_AFTER:
+            ctx.ui.say(NOTHING_HINT)
+            nothing_hinted = True
+        if waited > REPROMPT_AFTER * reprompts:
+            ctx.ui.redraw()
+            ctx.ui.physical(prompt)
+            ctx.ui.say("Still waiting. Do the steps above whenever you're ready, or press Ctrl-C to stop.")
+            reprompts += 1
+        if waited > timeout:
             proc.kill()
             break
         sleep(0.25)

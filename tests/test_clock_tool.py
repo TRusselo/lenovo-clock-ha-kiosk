@@ -320,3 +320,28 @@ def test_steps_are_in_the_manuals_order():
 def test_missing_linux_tools_are_named_with_their_package():
     missing = plan.missing_tools(which=lambda t: None if t == "img2simg" else "/usr/bin/" + t)
     assert len(missing) == 1 and "img2simg" in missing[0] and "libsparse" in missing[0]
+
+
+def test_flash_asks_first_unless_this_run_unlocked(tmp_path, monkeypatch):
+    for f in ("boot.img", "vendor.img", "vbmeta.img", "misc.img", "system_chunk.0", "oem_chunk.0",
+              "userdata_chunk.0"):
+        (tmp_path / "work" / "clock" / "images").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "work" / "clock" / "images" / f).write_bytes(b"x")
+    flashed = []
+    monkeypatch.setattr(flash, "fbmulti", lambda ctx, pairs, **kw: flashed.append(pairs))
+    with pytest.raises(flash.FlashFailed, match="Nothing was changed"):
+        flash.FlashStep().run(ctx_for(tmp_path, ui=FakeUI([""])))
+    assert flashed == []
+    flash.FlashStep().run(ctx_for(tmp_path, ui=FakeUI(["flash"])))
+    ui = FakeUI()
+    flash.FlashStep().run(ctx_for(tmp_path, ui=ui, unlocked_now=True))
+    assert len(flashed) == 2 and not any(l.startswith("[ask]") for l in ui.lines)
+
+
+def test_a_silent_fastboot_never_counts_as_locked(tmp_path):
+    runner = FakeRunner({("getvar",): Result(0, "")})
+    with pytest.raises(flash.FlashFailed, match="didn't say"):
+        flash.unlocked(ctx_for(tmp_path, runner=runner))
+    runner = FakeRunner({("getvar", "unlocked"): Result(0, "unlocked: yes\n"),
+                         ("getvar", "at-vboot-state"): Result(0, "(bootloader) avb-locked: 0\n")})
+    assert flash.unlocked(ctx_for(tmp_path, runner=runner)) == (True, True)
