@@ -105,11 +105,12 @@ def run_steps(steps: list[Step], ctx: Context, *, start_from: str | None = None,
     if start_from is not None and start_from not in names:
         raise ValueError(f"no step named {start_from!r}; steps are: {', '.join(names)}")
     done = [] if restart else _load(ctx)
+    # Steps --from passes over without their work being done: shown as skipped, never as done,
+    # and not saved as done, so a later run without --from still does them.
+    skipped = set()
     if start_from is not None:
-        for name in names[:names.index(start_from)]:
-            if name not in done:
-                done.append(name)
-    if all(n in done for n in names) and not ctx.dry_run and ctx.ui is not None:
+        skipped = {n for n in names[:names.index(start_from)] if n not in done}
+    if all(n in done or n in skipped for n in names) and not ctx.dry_run and ctx.ui is not None:
         ctx.ui.say("Every step is already done for this clock. Use --restart to run them again, "
                    "or --name to start a different clock.")
         return
@@ -124,8 +125,10 @@ def run_steps(steps: list[Step], ctx: Context, *, start_from: str | None = None,
     def done_numbers():
         return {i for i, s in enumerate(steps, 1) if s.name in done}
 
+    skipped_numbers = {i for i, s in enumerate(steps, 1) if s.name in skipped}
+
     for number, step in enumerate(steps, 1):
-        if step.name in done:
+        if step.name in done or step.name in skipped:
             continue
         if ctx.dry_run:
             if ctx.ui is not None:
@@ -133,7 +136,7 @@ def run_steps(steps: list[Step], ctx: Context, *, start_from: str | None = None,
             continue
         if shown:
             # Numbered like the headings in the manual (devices/cube/README.md).
-            ctx.ui.screen(titles, number, done_numbers())
+            ctx.ui.screen(titles, number, done_numbers(), skipped_numbers)
         if step.done(ctx):
             if ctx.ui is not None:
                 ctx.ui.say(f"Already done on the clock: {step.title}.")
@@ -144,6 +147,6 @@ def run_steps(steps: list[Step], ctx: Context, *, start_from: str | None = None,
         if shown:
             ctx.ui.ok(step.title)
     if shown:
-        ctx.ui.screen(titles, len(steps) + 1, done_numbers())
+        ctx.ui.screen(titles, len(steps) + 1, done_numbers(), skipped_numbers)
     for closing in ctx.after:
         closing()

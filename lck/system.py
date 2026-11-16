@@ -1,4 +1,4 @@
-"""Steps 8 to 10, over adb on Wi-Fi: find the clock, switch Google off, add a keyboard."""
+"""Over adb on Wi-Fi: find the clock, switch Google off (after root), add a keyboard."""
 from __future__ import annotations
 
 from lck import clock
@@ -7,17 +7,30 @@ from lck.downloads import fetch
 from lck.steps import Step
 
 CAST = "com.google.android.apps.mediashell"
-# Persistent apps: Android starts them again at boot even when disabled, and Cast grew to
-# about 594 MB of the clock's 1 GB. Uninstalled for user 0 (the APK stays: reversible).
-UNINSTALL = [CAST]
+# Cast is a persistent app in /oem/app: Android starts it at boot even when disabled, and it
+# grew to about 594 MB of the clock's 1 GB. `pm uninstall --user 0` answers Success, but Android
+# Things installs it again for user 0 at every boot (e2e run 2). What sticks: a Magisk boot
+# script that mounts an empty folder over Cast's app folder before Android looks there. So
+# this step comes after root. Undo: delete the script and the folder, and restart.
+CAST_DIR = "/oem/app/com.google.android.apps.mediashell"
+HIDE_SCRIPT = "/data/adb/post-fs-data.d/hide-cast.sh"
+EMPTY_DIR = "/data/adb/empty-cast"
+HIDE_CAST = f"""#!/system/bin/sh
+# lck: hide Cast from Android. Undo: delete this file and {EMPTY_DIR}, then restart.
+mkdir -p {EMPTY_DIR}
+mount -o bind {EMPTY_DIR} {CAST_DIR}
+"""
 DISABLE = ["com.google.assistant.launcher", "com.google.assistant.core",
            "com.google.android.things.checkin", "com.google.android.things.customcheckin"]
 # Lenovo's Things app drives the amp, mics, volume keys and light sensor. Never disable it.
 THINGS_APP = "com.google.android.things.sparrow.oem"
 IME = "rkr.simplekeyboard.inputmethod/.latin.LatinIME"
 IME_PKG = "rkr.simplekeyboard.inputmethod"
-ASK_IP = ("Type the clock's address on your Wi-Fi, such as 10.0.0.23, and press Enter. Your router's "
-          "list of connected devices shows it (the clock may appear as \"Android\"): ")
+WHY_WIFI = ("From here on the tool talks to the clock over Wi-Fi: once Android runs, the clock's USB port "
+            "only works as a host, so the computer can't reach it over the cable.")
+WHERE_IP = ("To find the clock's address, on the clock: swipe up from the bottom, tap the gear (Settings), then "
+            "About device. It's under IP address. Your router's list of devices shows it too.")
+ASK_IP = "Type the clock's address, such as 10.0.0.23, and press Enter: "
 
 
 def channel(ctx) -> str:
@@ -27,6 +40,8 @@ def channel(ctx) -> str:
 
 
 def ask_ip(ctx) -> None:
+    ctx.ui.say(WHY_WIFI)
+    ctx.ui.physical(WHERE_IP)
     while True:
         answer = ctx.ui.ask(ASK_IP).strip()
         if clock.valid_ip(answer):
@@ -70,6 +85,10 @@ def _packages(ctx, *flags: str) -> set[str]:
     return {l.split(":", 1)[1].strip() for l in out.splitlines() if l.startswith("package:")}
 
 
+def cast_hidden(ctx) -> bool:
+    return CAST not in _packages(ctx) and not shell(ctx, "pidof", CAST, check=False).strip()
+
+
 class DegoogleStep(Step):
     name = "degoogle"
     title = "Switch off Cast, Google Assistant and the check-ins"
@@ -81,17 +100,32 @@ class DegoogleStep(Step):
 
     def run(self, ctx) -> None:
         clock.require_clock(ctx)
+        if not clock.has_root(ctx):
+            raise SetupFailed("Hiding Cast needs root, and adb doesn't have it. Run the root step first: "
+                              "lck setup --from root")
         installed = _packages(ctx)
         with ctx.ui.busy("Switching off Google's apps"):
-            for p in UNINSTALL:
-                if p in installed:
-                    shell(ctx, "pm", "uninstall", "-k", "--user", "0", p, check=False)
             for p in DISABLE:
                 if p in installed:
                     shell(ctx, "pm", "disable-user", "--user", "0", p, check=False)
+            if CAST in installed:
+                local = ctx.paths.root / "work" / "hide-cast.sh"
+                local.parent.mkdir(parents=True, exist_ok=True)
+                local.write_text(HIDE_CAST, encoding="utf-8")
+                clock.adb(ctx, "push", local, "/data/local/tmp/hide-cast.sh", timeout=60)
+                shell(ctx, "su", "-c", f"mkdir -p {HIDE_SCRIPT.rsplit('/', 1)[0]} {EMPTY_DIR} && "
+                                       f"cp /data/local/tmp/hide-cast.sh {HIDE_SCRIPT} && chmod 755 {HIDE_SCRIPT} "
+                                       f"&& rm /data/local/tmp/hide-cast.sh", timeout=60)
         clock.reboot(ctx, why="the clock to restart without them")
-        if not self.done(ctx):
-            raise SetupFailed("Google's apps came back after the restart. Please report this, with the log.")
+        if CAST in _packages(ctx):
+            raise SetupFailed(f"Cast came back after the restart: the boot script at {HIDE_SCRIPT} didn't hide "
+                              "it. Please report this, with the log.")
+        back = [p for p in DISABLE if p in _packages(ctx) and p not in _packages(ctx, "-d")]
+        if back:
+            raise SetupFailed(f"{', '.join(back)} came back on after the restart. Please report this, with "
+                              "the log.")
+        ctx.ui.keep("The clock's screen stays blank, or shows four dots, until Kiosk Satellite is installed in "
+                    "a few steps: that's expected. Swiping up still opens the settings.")
         if not shell(ctx, "pidof", THINGS_APP, check=False).strip():
             ctx.ui.say("Note: Lenovo's Things app (volume keys, light sensor) isn't running yet. It usually "
                        "starts within a minute.")

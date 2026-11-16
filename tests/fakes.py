@@ -85,9 +85,10 @@ class FakeUI:
     def intro(self, text):
         self.lines.append(text)
 
-    def screen(self, titles, current, done):
+    def screen(self, titles, current, done, skipped=frozenset()):
         self.lines.append(f"[screen {current}/{len(titles)}] " +
-                          " ".join(f"{t}:{'done' if i in done else 'todo'}" for i, t in enumerate(titles, 1)))
+                          " ".join(f"{t}:{'done' if i in done else 'skipped' if i in skipped else 'todo'}"
+                                   for i, t in enumerate(titles, 1)))
 
     @contextlib.contextmanager
     def busy(self, text, interval=3.0):

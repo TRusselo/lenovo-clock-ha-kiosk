@@ -142,7 +142,8 @@ def fetch(entry_id: str, ctx) -> Path:
     if not (file.exists() and verified.exists() and verified.read_text() == e["sha256"]):
         part = file.with_name(file.name + ".part")
         total = e["size"]
-        with _busy(ctx, f"Downloading {file.name} ({human_size(total)})") as job:
+        shown = e.get("name") or file.name     # mtkclient's file is named after a commit hash
+        with _busy(ctx, f"Downloading {shown} ({human_size(total)})") as job:
             def progress(got):
                 if job is not None and total >= 1024 ** 2:
                     job.note(f"{round(got / 1024 ** 2)} of {round(total / 1024 ** 2)} MB, "

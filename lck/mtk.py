@@ -77,7 +77,7 @@ def _ok(text: str, commands: list[str]) -> bool:
 
 
 def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str = BROM_PROMPT,
-                sleep=time.sleep, timeout: float = 4 * 3600) -> str:
+                sleep=time.sleep, timeout: float = 4 * 3600, weights: list[int] | None = None) -> str:
     """Start mtkclient with `commands` (one session), ask for BROM, and show progress
     until it's done. A failed attempt (the preloader, a stale BROM) is retried with a
     fresh power-cycle; nothing is written in a failed attempt before the DA takes over."""
@@ -92,7 +92,7 @@ def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str 
         proc = ctx.runner.spawn(args, out_file=log, cwd=cwd)
         try:
             ctx.ui.physical(prompt)
-            text = _follow(ctx, proc, log, title, sleep, timeout, commands, prompt)
+            text = _follow(ctx, proc, log, title, sleep, timeout, commands, prompt, weights)
         except MtkFailed:
             text = ""
         except BaseException:
@@ -112,7 +112,8 @@ def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str 
     raise AssertionError("unreachable")
 
 
-def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, prompt: str) -> str:
+def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, prompt: str,
+            weights=None) -> str:
     start = time.monotonic()
     last = None
     hinted = nothing_hinted = False
@@ -153,7 +154,7 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
         ctx.ui.say("Found it. Let go of the buttons. Leave the clock plugged in until this finishes.")
         with ctx.ui.busy(title) as job:
             while proc.poll() is None:
-                pct = _last_percent(log)
+                pct = overall(log, weights or [1] * len(commands))
                 if pct is not None:
                     job.note(f"{pct:.0f}%", pct, 100)
                 if time.monotonic() - start > timeout:
@@ -165,6 +166,20 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
             return text
     proc.wait()
     return ctx.runner.finished(proc)
+
+
+def overall(log: Path, weights: list[int]):
+    """One bar for the whole session (e2e run 2: the bar filled once per partition): the
+    commands finished so far, by size, plus the running one's own percent."""
+    try:
+        text = log.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    finished = min(len(re.findall(r"^(?:Wrote|Dumped) ", text.replace("\r", "\n"), re.M)), len(weights))
+    pct = _last_percent(log) if finished < len(weights) else 100.0
+    total = sum(weights) or 1
+    return 100 * (sum(weights[:finished]) + (weights[finished] * (pct or 0) / 100
+                                             if finished < len(weights) else 0)) / total
 
 
 def _last_percent(log: Path):

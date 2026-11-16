@@ -29,9 +29,9 @@ def _windows_vt_on() -> bool:
 # (Windows with output piped or redirected uses cp1252).
 _FANCY = {"ok": "\u2713", "todo": "\u00b7", "fail": "\u2717", "full": "\u2588", "empty": "\u2591",
           "spin": "\u280b\u2819\u2839\u2838\u283c\u2834\u2826\u2827\u2807\u280f", "arrow": "\u25b6",
-          "now": "\u25b8", "to": "\u2192"}
+          "now": "\u25b8", "to": "\u2192", "skip": "\u2013"}
 _PLAIN = {"ok": "[x]", "todo": "[ ]", "fail": "[!]", "full": "#", "empty": "-", "spin": "|/-\\",
-          "arrow": ">", "now": ">", "to": "->"}
+          "arrow": ">", "now": ">", "to": "->", "skip": "[-]"}
 
 # Purple and cyan for the screen itself, yellow for anything the user has to do,
 # red only for errors. Purple and cyan come from the fixed 256-colour palette:
@@ -43,7 +43,8 @@ CLEAR = "\x1b[H\x1b[2J\x1b[3J"     # the screen and the scrollback: no banner or
 TITLE = "Lenovo Smart Clock {to} Home Assistant"
 DEVICE = "Lenovo Smart Clock"
 # Buttons and keys the user presses: bold wherever they're asked for.
-_BUTTONS = re.compile(r"\b(VOLUME UP|VOLUME DOWN|FINISH|Finish|Enter|[Ll]et go(?: of the buttons)?)\b")
+_BUTTONS = re.compile(r"\b(VOLUME UP|VOLUME DOWN|FINISH|Finish|Enter|Unplug|Hold no buttons|holding no buttons|"
+                      r"[Ll]et go(?: of the buttons| of VOLUME UP)?)\b")
 
 
 def _old_windows_console() -> bool:
@@ -175,7 +176,7 @@ class UI:
         """The redrawn screen: a terminal that takes colour, and isn't Windows' classic console."""
         return self._colour() and not _old_windows_console()
 
-    def screen(self, titles, current: int, done) -> None:
+    def screen(self, titles, current: int, done, skipped=frozenset()) -> None:
         """The setup screen at the start of step `current` (1-based; past the end: all done).
         On a terminal: cleared and redrawn. Otherwise: the list once, then a line per step."""
         self._end_status()
@@ -188,7 +189,7 @@ class UI:
                 self.stdout.write(f"\nStep {current} of {total}: {titles[current - 1]}\n")
                 self.stdout.flush()
             return
-        self._last = (self.screen, (titles, current, done))
+        self._last = (self.screen, (titles, current, done, skipped))
         sym = self._symbols()
         width = 32
         count = len(done)
@@ -201,6 +202,8 @@ class UI:
                 out.append("  " + self._paint(_NOW, f"{sym['now']} {t}") + "\n")
             elif i in done:
                 out.append(f"  {self._paint(_CYAN, sym['ok'])} {self._paint(_DIM, t)}\n")
+            elif i in skipped:
+                out.append("  " + self._paint(_DIM, f"{sym['skip']} {t} (skipped)") + "\n")
             else:
                 out.append("  " + self._paint(_DIM, f"{sym['todo']} {t}") + "\n")
         out.append("\n")

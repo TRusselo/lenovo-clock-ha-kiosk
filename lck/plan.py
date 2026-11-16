@@ -123,6 +123,6 @@ class VerifyStep(Step):
 def setup_steps() -> list[Step]:
     return [
         PrerequisitesStep(), BackupStep(), UnlockStep(), ImagesStep(), UserdataStep(), MiscStep(),
-        FlashStep(), ConnectStep(), DegoogleStep(), KeyboardStep(), InstallStep(), GrantsStep(),
-        SettingsStep(), RootStep(), VerifyStep(),
+        FlashStep(), ConnectStep(), RootStep(), DegoogleStep(), KeyboardStep(), InstallStep(), GrantsStep(),
+        SettingsStep(), VerifyStep(),
     ]

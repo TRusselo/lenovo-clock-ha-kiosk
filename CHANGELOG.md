@@ -4,6 +4,22 @@ What changed for people converting a clock. Newest first.
 
 ## Unreleased
 
+### Fixes from the second end-to-end run
+- **Cast stays off.** Removing it for user 0 only lasted until the next restart: Android Things put it back at
+  every boot. Root now comes before switching Google off, and Cast is hidden with a Magisk boot script.
+- **After a flash, the replug box stays on screen** until the clock has left fastboot, instead of being replaced
+  at once by the address question.
+- **The address question says where to find it on the clock** (Settings, About device), and why the rest is over
+  Wi-Fi. A converted clock adb already knows is found without `--ip`.
+- **Clearer boxes:** the fastboot box names the mode and says passing through BROM is normal; "Found it" only after
+  asking; Magisk's Shell grant matches v31.1 (+, Shell, back arrow); Unplug and Hold no buttons are bold; the blank
+  screen before Kiosk Satellite is explained; Kiosk Satellite's settings import is mentioned.
+- **The screen tells the truth:** a step passed over with `--from` shows as skipped, not ✓; a stop logs its own
+  reason, so the log lines under it are about this stop; a stop that leaves the clock in BROM or fastboot says
+  how to start it normally; the opening note leaves out a backup that's already there.
+- **Restore:** one bar for the whole write, real times (about 15 minutes to write, 35 to back up).
+- **GitHub's lookup limit:** `GITHUB_TOKEN` lifts it.
+
 ### The guided tool, `lck`
 - **One command converts a clock:** `lck setup`, in 15 steps numbered like the [manual](devices/cube/README.md).
   It looks and works like the Smart Display's `lhk`: the same redrawn setup screen with a progress bar and every

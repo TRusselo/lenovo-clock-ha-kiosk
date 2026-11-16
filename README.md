@@ -111,7 +111,8 @@ Android. So the tool:
 - **unlocks the bootloader and verified boot**, which wipes the clock's user data;
 - **rebuilds slot A from the backup:** the clock's own stock software, and its own user data, edited on the
   computer so adb over Wi-Fi comes up with your computer's key, and Google's updates pointed nowhere;
-- **finishes over Wi-Fi:** Google off, a keyboard, Kiosk Satellite, and root with Magisk;
+- **finishes over Wi-Fi:** root with Magisk, then Google off (hiding Cast for good needs root), a keyboard, and
+  Kiosk Satellite;
 - **tells you exactly which buttons to hold, and when to let go.** The screen stays dark in those modes, so the
   tool shows which mode the clock is in;
 - **can stop and pick up again.** Run the same command again to continue where it stopped.
@@ -121,7 +122,7 @@ browser at an address the tool shows you. The tool never sees your passwords.
 
 **To make another backup** at any time: `.venv/bin/python -m lck backup --name clock-later`.
 **To go back** to a backup, in the same folder: `.venv/bin/python -m lck restore backup/clock.zip`. It checks the
-backup is from this clock, then writes it back in BROM mode. It takes about 45 minutes. A backup only restores to
+backup is from this clock, then writes it back in BROM mode. It takes about 20 minutes. A backup only restores to
 the clock it came from.
 
 ## Credits

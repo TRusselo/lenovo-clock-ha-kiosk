@@ -93,7 +93,7 @@ def _backup(args) -> int:
         ctx.ui.say(f"There's already a complete backup for --name {args.name} in {out}. Give this one "
                    "another --name, or move that one somewhere safe first.")
         return 1
-    ctx.ui.say("This copies the clock's whole disk in BROM mode: about 40 minutes, and 9 GB free while it "
+    ctx.ui.say("This copies the clock's whole disk in BROM mode: about 35 minutes, and 9 GB free while it "
                "works (about 0.7 GB when done). Nothing on the clock is changed.")
     _tools(ctx)
     backup.backup(ctx, out)
@@ -115,7 +115,7 @@ def _restore(args) -> int:
     ctx = _context(args)
     ctx.ui.title("Restore a backup")
     ctx.ui.say("This puts a backup back on the clock it came from: its system on both slots and its user "
-               "data. It takes about 45 minutes, in BROM mode twice: once to check it's the right clock, "
+               "data. It takes about 20 minutes, in BROM mode twice: once to check it's the right clock, "
                "once to write. You'll type restore to confirm, after the check.")
     if folder.is_file() and folder.suffix.lower() == ".zip":
         try:
@@ -143,12 +143,51 @@ def _setup(args) -> int:
     ctx.dry_run = args.dry_run
     ctx.state["skip_backup"] = args.skip_backup
     fresh = args.restart or not (ctx.paths.progress / f"{ctx.state.get('progress_id')}.json").exists()
+    if not ctx.state.get("ip") and not args.dry_run:
+        # UX run 1: a converted clock wasn't recognised without --ip. Ask only what adb already knows.
+        try:
+            from lck.downloads import fetch
+            fetch(f"platform-tools-{platform_id()}", ctx)
+            found = clock.find_on_wifi(ctx)
+        except Exception:
+            found = None
+        if found:
+            ctx.state["ip"] = found
     if fresh and not args.dry_run and args.start_from is None:
-        ctx.ui.intro("Setup takes about 1 hour 30 minutes and needs 20 GB free: about 200 MB of downloads, "
-                     "a backup of the whole clock (40 minutes, 0.7 GB kept), and the images built from it. "
-                     "The tool tells you each time it needs you at the clock.")
+        ctx.ui.intro(_intro(ctx))
     run_steps(plan.setup_steps(), ctx, start_from=args.start_from, restart=args.restart)
     return 0
+
+
+def _intro(ctx) -> str:
+    """What this run will take, leaving out what's already done (e2e run 2: a seeded backup was
+    still promised as 40 minutes)."""
+    if ctx.state.get("ip") and clock.converted(ctx):
+        return (f"The clock at {ctx.state['ip']} is already converted: steps whose work is there skip "
+                "themselves. To only back it up, stop with Ctrl-C and run lck backup instead.")
+    has_backup = not backup.verify_backup(ctx.paths.backup / ctx.state.get("progress_id", "clock"))
+    if has_backup:
+        return ("Setup takes about 45 minutes and needs 15 GB free: about 200 MB of downloads, and the images "
+                "built from the backup already here. The tool tells you each time it needs you at the clock.")
+    return ("Setup takes about 1 hour 15 minutes and needs 20 GB free: about 200 MB of downloads, a backup of "
+            "the whole clock (about 35 minutes, 0.7 GB kept), and the images built from it. The tool tells you "
+            "each time it needs you at the clock.")
+
+
+def _log_error(args, text: str) -> None:
+    """The reason itself goes in the log, so the tail shown under it is about this stop
+    (e2e run 2: a GitHub error showed the previous run's mtkclient lines)."""
+    name, workdir = getattr(args, "name", None), getattr(args, "workdir", None)
+    if not name or workdir is None:
+        return
+    from lck.log import redact
+    try:
+        f = Paths(workdir).logs / f"{name}.log"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        with open(f, "a", encoding="utf-8") as out:
+            out.write(redact(f"STOPPED {text}") + "\n")
+    except OSError:
+        pass
 
 
 def main(argv=None) -> int:
@@ -157,12 +196,25 @@ def main(argv=None) -> int:
         return {"setup": _setup, "backup": _backup, "restore": _restore, "status": _status}[args.command](args)
     except KeyboardInterrupt:
         print("\nStopped. Run the same command again to continue where you left off.", file=sys.stderr)
+        _stuck(args)
         return 130
     except Exception as e:  # every failure ends in plain words, not a traceback
+        _log_error(args, str(e))
         print(f"\nStopped: {e}", file=sys.stderr)
         _print_log_tail(args)
         print("Run the same command again to retry this step.", file=sys.stderr)
+        _stuck(args, str(e))
         return 1
+
+
+def _stuck(args, said: str = "") -> None:
+    """UX run 1: a stop left the clock in fastboot, dark, with no word about it."""
+    if getattr(args, "command", "") == "status":
+        return
+    from lck.modes import stuck_hint
+    hint = stuck_hint()
+    if hint and hint not in said:
+        print(hint, file=sys.stderr)
 
 
 def _print_log_tail(args, lines: int = 12) -> None:

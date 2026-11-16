@@ -9,4 +9,4 @@ DOCS_URL = "https://github.com/TRusselo/lenovo-clock-ha-kiosk/blob/main"
 def doc(path: str, section: str = "") -> str:
     """A doc named in a message: next to the program, and online."""
     where = f"{path}, {section}" if section else path
-    return f"{where} (in this folder, or {DOCS_URL}/{path})"
+    return f"{where} (in the tool's folder, or {DOCS_URL}/{path})"

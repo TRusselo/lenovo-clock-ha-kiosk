@@ -18,8 +18,7 @@ from pathlib import Path
 from lck import backup, clock, images
 from lck.clock import SetupFailed, shell
 from lck.downloads import fetch
-from lck.flash import fbmulti
-from lck.modes import POWER_CYCLE
+from lck.flash import fbmulti, restart_from_fastboot
 from lck.steps import Step
 from lck.ui import choose
 
@@ -102,7 +101,7 @@ class RootStep(Step):
         patched = patch(ctx, boot)
         ctx.ui.say("Now the patched boot image goes on slot A. Only boot_a is written.")
         fbmulti(ctx, [(patched, "boot_a")], title="Flashing the patched boot image")
-        ctx.ui.physical(POWER_CYCLE)
+        restart_from_fastboot(ctx)
         clock.wait_booted(ctx, why="the clock to start with Magisk")
         if "package:" not in shell(ctx, "pm", "path", MAGISK_PKG, check=False):
             with ctx.ui.busy("Installing the Magisk app"):
@@ -115,15 +114,24 @@ class RootStep(Step):
         ctx.ui.keep(f"Rooted. To undo, flash {boot} to boot_a (see the manual's Restore section).")
 
     def _first_run(self, ctx) -> None:
+        old = clock.boot_id(ctx)
         shell(ctx, "monkey", "-p", MAGISK_PKG, "-c", "android.intent.category.LAUNCHER", "1", check=False)
-        ctx.ui.physical("Magisk is open on the clock. If it says Requires Additional Setup, tap OK: the "
-                        "clock restarts on its own. Close any popup offering to patch: it's done already.")
-        if choose(ctx.ui, "Press Enter once the clock has restarted, or type stop: ", "stop"):
-            raise RootFailed("Stopped before Magisk was set up. Run the same command again to carry on.")
-        clock.wait_booted(ctx, why="the clock to restart")
+        ctx.ui.physical("Magisk is open on the clock. It says Requires Additional Setup: tap OK. The clock "
+                        "restarts on its own, and the tool waits for it. Close any popup offering to patch: "
+                        "that's done already.")
+        try:
+            clock.wait_restarted(ctx, old, timeout=300, why="the clock to restart, after you tap OK")
+        except SetupFailed:
+            if choose(ctx.ui, "The clock hasn't restarted. If Magisk didn't ask for extra setup, press Enter to "
+                              "carry on, or type stop: ", "stop"):
+                raise RootFailed("Stopped before Magisk was set up. Run the same command again to carry on.")
+        clock.wait_booted(ctx, why="the clock to start")
         shell(ctx, "su", "-c", "id", check=False, timeout=30)   # asks Magisk, which logs the request
         shell(ctx, "monkey", "-p", MAGISK_PKG, "-c", "android.intent.category.LAUNCHER", "1", check=False)
-        ctx.ui.physical("In Magisk, open the Superuser tab (the shield at the bottom) and switch Shell on. "
+        ctx.ui.physical("Now let adb use root. In Magisk, open the Superuser tab (the shield at the bottom):\n"
+                        "  1. Tap + (add)\n"
+                        "  2. Tick Shell in the list\n"
+                        "  3. Tap the back arrow, top left. Shell is now listed, with its switch on\n"
                         "Stay out of the Modules tab: its file picker has no way back on this screen.")
         while not clock.has_root(ctx):
             if choose(ctx.ui, "Press Enter once Shell is switched on, or type stop: ", "stop"):

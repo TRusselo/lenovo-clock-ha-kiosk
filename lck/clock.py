@@ -127,6 +127,40 @@ def wait_booted(ctx, timeout=600, why="the clock to start", sleep=time.sleep) ->
             sleep(3)
 
 
+def boot_id(ctx) -> str:
+    """Changes at every start: tells a restart apart from a clock that never went down."""
+    try:
+        return shell(ctx, "cat", "/proc/sys/kernel/random/boot_id", check=False, timeout=15).strip()
+    except Exception:
+        return ""
+
+
+def wait_restarted(ctx, old_id: str, timeout=600, why="the clock to restart", sleep=time.sleep) -> None:
+    """Wait for a restart that someone else started (Magisk's extra setup), then for Android."""
+    end = time.monotonic() + timeout
+    with ctx.ui.busy(f"Waiting for {why}"):
+        while not (booted(ctx) and boot_id(ctx) not in ("", old_id)):
+            if time.monotonic() > end:
+                raise SetupFailed(f"The clock didn't restart within {timeout // 60} minutes.")
+            sleep(3)
+
+
+def find_on_wifi(ctx) -> str | None:
+    """A gen-1 clock adb is already connected to over Wi-Fi (adb devices), or None.
+    Only devices adb already knows are asked; the network isn't scanned."""
+    out = _run(ctx, "devices", check=False, timeout=15).out
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[1] == "device" and parts[0].endswith(f":{PORT}"):
+            ip = parts[0].rsplit(":", 1)[0]
+            if not valid_ip(ip):
+                continue
+            r = _run(ctx, "-s", parts[0], "shell", "getprop", "ro.product.device", check=False, timeout=15)
+            if r.out.strip() == DEVICE:
+                return ip
+    return None
+
+
 def reboot(ctx, why="the clock to restart") -> None:
     adb(ctx, "reboot", check=False, timeout=30)
     time.sleep(10)

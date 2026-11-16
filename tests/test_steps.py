@@ -48,12 +48,19 @@ def test_skips_when_step_done_returns_true(tmp_path):
     assert progress(ctx)["done"] == ["unlock", "flash"]
 
 
-def test_start_from_marks_earlier_steps_done(tmp_path):
+def test_start_from_skips_earlier_steps_without_calling_them_done(tmp_path):
+    # E2E run 2: a step that failed, then passed over with --from, showed a tick.
+    from tests.fakes import FakeUI
     ctx = make_ctx(tmp_path)
+    ctx.ui = FakeUI()
     ran = []
     run_steps([Recorder("a", ran), Recorder("b", ran), Recorder("c", ran)], ctx, start_from="c")
     assert ran == ["c"]
-    assert progress(ctx)["done"] == ["a", "b", "c"]
+    assert progress(ctx)["done"] == ["c"]
+    assert any("a:skipped b:skipped c:todo" in l for l in ctx.ui.lines if l.startswith("[screen"))
+    ran.clear()
+    run_steps([Recorder("a", ran), Recorder("b", ran), Recorder("c", ran)], ctx)
+    assert ran == ["a", "b"]      # a later run without --from still does them
 
 
 def test_start_from_unknown_step_raises(tmp_path):

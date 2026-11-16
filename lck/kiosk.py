@@ -15,7 +15,7 @@ from pathlib import Path
 
 import requests
 
-from lck import clock
+from lck import clock, doc
 from lck.apkcert import check as check_cert
 from lck.clock import adb, shell
 from lck.steps import Step
@@ -49,11 +49,20 @@ def _rate_limited(r) -> None:
             when = " after " + datetime.datetime.fromtimestamp(int(headers["X-RateLimit-Reset"])).strftime("%H:%M")
         raise KioskError("GitHub is limiting lookups from your internet connection right now. It allows "
                          "60 an hour, shared by every device on your network. Run the same command "
-                         f"again{when}.")
+                         f"again{when}, or set GITHUB_TOKEN to a GitHub token first: "
+                         + doc("docs/LINUX.md", "If GitHub limits lookups") + ".")
+
+
+def _headers() -> dict:
+    """GitHub allows 60 anonymous lookups an hour, shared by everyone on the network (e2e run 2
+    hit it). A token in GITHUB_TOKEN lifts that; it's only sent to GitHub's API."""
+    import os
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    return {"Authorization": f"Bearer {token}"} if token else {}
 
 
 def latest_release(http) -> tuple[str, str, str]:
-    r = http.get(RELEASES, timeout=30)
+    r = http.get(RELEASES, timeout=30, headers=_headers())
     _rate_limited(r)
     r.raise_for_status()
     for a in r.json().get("assets", []):
@@ -169,7 +178,8 @@ class SettingsStep(Step):
         shell(ctx, "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1", check=False)
         ctx.ui.physical("Kiosk Satellite is open on the clock. Go through its setup pages: a name and an "
                         "admin password, your Home Assistant address and sign-in, the dashboard to show, "
-                        "and the voice options. Permissions are already done by this tool, so on the last "
+                        "and the voice options. If you have a Kiosk Satellite settings export from another "
+                        "device, you can import it instead of filling these in. Permissions are already done by this tool, so on the last "
                         "page just press Finish. Then, in its settings:\n"
                         "  1. Turn on \"Act as the home screen\"\n"
                         "  2. Turn on forced landscape, if the screen is sideways\n"

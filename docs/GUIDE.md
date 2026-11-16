@@ -16,9 +16,9 @@ Every page in one place, in the order you'll need them.
        |-- flash --------------->  fastboot mode (screen dark)
        |                           starts stock Android Things, joins your Wi-Fi
        |-- you: the clock's address
+       |-- root ---------------->  fastboot mode, then you: Magisk
        |-- Google off, keyboard, Kiosk Satellite (over Wi-Fi)
        |                           you: Kiosk Satellite setup
-       |-- root ---------------->  fastboot mode, then you: Magisk
        |-- final check
        v
  3. Keep the backup zip            Home Assistant dashboard
@@ -73,13 +73,20 @@ The clock runs on its barrel plug; the USB cable alone doesn't start it.
 - It often takes two or three tries. Unplug the power fully each time.
 - Check the cable: straight-through A-to-A, into the clock's USB port.
 
+## Why everything after the flash is over Wi-Fi
+
+Once Android runs, the clock's USB port only works as a host (for a USB stick, say), so the computer can't reach it
+over the cable. The setup switches on adb over Wi-Fi in the clock's user data before flashing, so the tool can
+reach it there.
+
 ## If the clock doesn't come back
 
 After the flash, the first start takes a few minutes, and the clock joins the Wi-Fi saved in the backup. If the
 tool can't reach it:
 
 1. Check the screen: the clock face means it started.
-2. Find its address in your router's list of devices, and run the same command with `--ip <address>`.
+2. Find its address on the clock (swipe up from the bottom, the gear, About device, IP address) or in your
+   router's list of devices, and run the same command with `--ip <address>`.
 3. If the Wi-Fi saved in the backup no longer exists, the clock has no network. Please report this.
 
 ## Problems or questions

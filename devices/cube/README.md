@@ -50,7 +50,7 @@ In BROM, from a new folder, in one session:
 python mtk.py multi "rf full_user.bin;r preloader boot1.bin --parttype boot1;r preloader boot2.bin --parttype boot2"
 ```
 
-The whole user area (every partition, **userdata included**) takes about 40 minutes. Then:
+The whole user area (every partition, **userdata included**) takes about 35 minutes. Then:
 
 ```bash
 head -c 17408 full_user.bin > gpt.bin
@@ -142,21 +142,54 @@ takes a few minutes.
 ## 8. `connect`: adb over Wi-Fi
 
 Find the clock's address in your router's list of devices (it may show as "Android"), then
-`adb connect <clock-ip>:5555`. Always pass `-s <clock-ip>:5555`, so nothing else connected is touched.
+`adb connect <clock-ip>:5555`. On the clock itself: swipe up from the bottom, the gear (Settings), About device,
+IP address. Always pass `-s <clock-ip>:5555`, so nothing else connected is touched.
 
 **Check:**
 - `adb -s <clock-ip>:5555 shell getprop ro.product.device` → `mt8167s_som`
 - `... getprop ro.boot.slot_suffix` → `_a`
 - `... update_engine_client --show_channel` → `none-channel`
 
-## 9. `degoogle`: Cast, Assistant, check-ins
+## 9. `root`: Magisk
+
+Root comes before switching Google off: hiding Cast for good needs it (step 10). Most people expect root
+anyway. The clock has no userdebug build, so the Smart Display's `adb root` route doesn't exist
+here, and **`adb disable-verity` would likely stop it starting** (LK refuses a vbmeta with verity flags set).
+Magisk patches only `boot_a`; system and verity stay untouched.
+
+1. Patch the stock boot image (`boot-stock.img` from step 4) **on the clock**, as the Magisk app does: push
+   Magisk v31.1's `assets/boot_patch.sh`, `assets/util_functions.sh` and its `lib/armeabi-v7a/` binaries
+   (`libmagiskboot.so` as `magiskboot`, and so on, plus an empty `stub.apk`) to `/data/local/tmp/lck-magisk`,
+   then run `KEEPVERITY=true KEEPFORCEENCRYPT=true LEGACYSAR=true sh boot_patch.sh boot.img` there and pull
+   `new-boot.img`. `LEGACYSAR` matters: LK always passes `skip_initramfs`, and Magisk's kernel patch turns it into
+   `want_initramfs` so its ramdisk loads.
+2. Flash only `boot_a`: start `python fbmulti.py new-boot.img=boot_a`, then enter fastboot. Power-cycle.
+3. `adb install Magisk-v31.1.apk`, then open it. It shows **Requires Additional Setup**: tap OK; the clock
+   restarts. Until then `magiskd` rejects every `su`.
+4. Run `adb shell su -c id` once (it's rejected and logged), then in Magisk's **Superuser** tab tap **+**, tick
+   **Shell**, and tap the back arrow (top left): Shell is then listed with its switch on. Avoid the Modules tab's file picker: it has no way out on the clock's screen (`adb shell input keyevent
+   KEYCODE_BACK` twice gets out). Close the "patch" popup: boot is already patched.
+
+**Check:** `adb shell magisk -v` prints `31.1:MAGISK:R`; `adb shell su -c id` prints `uid=0(root)`;
+`pidof com.google.android.things.sparrow.oem` prints a number.
+
+## 10. `degoogle`: Cast, Assistant, check-ins
 
 Cast (`mediashell`) and Assistant core are **persistent** apps: `disable-user` alone doesn't stop them, Android
 starts them again at boot, and Cast grew to about 594 MB of the clock's 1 GB, starving WebView until Kiosk
-Satellite was killed. Uninstall Cast for user 0 instead (the APK stays; reversible), and disable the rest:
+Satellite was killed. **`pm uninstall -k --user 0` doesn't last for Cast:** it answers `Success`, but Android
+Things installs Cast again for user 0 at every boot, and `pm disable` as root doesn't stop it either. What lasts
+is a Magisk boot script that mounts an empty folder over Cast's app folder before Android looks there:
 
 ```bash
-adb shell pm uninstall -k --user 0 com.google.android.apps.mediashell
+cat > hide-cast.sh <<'EOS'
+#!/system/bin/sh
+# lck: hide Cast from Android. Undo: delete this file and /data/adb/empty-cast, then restart.
+mkdir -p /data/adb/empty-cast
+mount -o bind /data/adb/empty-cast /oem/app/com.google.android.apps.mediashell
+EOS
+adb push hide-cast.sh /data/local/tmp/
+adb shell su -c "mkdir -p /data/adb/post-fs-data.d /data/adb/empty-cast && cp /data/local/tmp/hide-cast.sh /data/adb/post-fs-data.d/ && chmod 755 /data/adb/post-fs-data.d/hide-cast.sh"
 for p in com.google.assistant.launcher com.google.assistant.core \
          com.google.android.things.checkin com.google.android.things.customcheckin; do
   adb shell pm disable-user --user 0 $p
@@ -164,14 +197,17 @@ done
 adb reboot
 ```
 
-Undo Cast: `adb shell cmd package install-existing com.google.android.apps.mediashell`.
+Undo Cast: delete `/data/adb/post-fs-data.d/hide-cast.sh` and `/data/adb/empty-cast`, then restart.
+
+Until Kiosk Satellite is installed (step 12), the screen stays blank or shows four dots: Assistant's home screen
+is off. Swiping up still opens the settings.
 
 **Never disable** `com.google.android.things.sparrow.oem`: on the clock it drives the light sensor and volume keys.
 
-**Check, after the restart:** `adb shell pidof com.google.android.apps.mediashell` prints nothing;
+**Check, after the restart:** `adb shell pm list packages com.google.android.apps.mediashell` prints nothing;
 `adb shell pidof com.google.android.things.sparrow.oem` prints a number.
 
-## 10. `keyboard`: an on-screen keyboard
+## 11. `keyboard`: an on-screen keyboard
 
 The clock's Android Things has **no input method at all**, so text fields on the screen can't be typed into.
 Install [Simple Keyboard](https://github.com/rkkr/simple-keyboard) (release 149, pinned in the manifest):
@@ -185,7 +221,7 @@ adb shell ime set rkr.simplekeyboard.inputmethod/.latin.LatinIME
 **Check:** `adb shell settings get secure default_input_method` prints
 `rkr.simplekeyboard.inputmethod/.latin.LatinIME`.
 
-## 11. `kiosk-install`: Kiosk Satellite
+## 12. `kiosk-install`: Kiosk Satellite
 
 Download the newest `*armeabi-v7a.apk` from Kiosk Satellite's releases. Check its digest (release API) and its
 signing certificate `2a77134ce11f65ba9d08bed669fdcb742a25633c5665a6135aeca30040b068fc`
@@ -193,7 +229,7 @@ signing certificate `2a77134ce11f65ba9d08bed669fdcb742a25633c5665a6135aeca30040b
 
 **Check:** `adb shell pm path me.jxl.kiosk_satellite` prints a `package:` line.
 
-## 12. `kiosk-grants`: permissions and device owner
+## 13. `kiosk-grants`: permissions and device owner
 
 ```bash
 adb shell appops set me.jxl.kiosk_satellite REQUEST_INSTALL_PACKAGES allow
@@ -208,7 +244,7 @@ adb shell dpm set-device-owner me.jxl.kiosk_satellite/.KioskAdminReceiver
 
 **Check:** `adb shell dumpsys device_policy` shows Kiosk Satellite under `Device Owner`.
 
-## 13. `kiosk-settings`: setup wizard and settings
+## 14. `kiosk-settings`: setup wizard and settings
 
 1. Go through Kiosk Satellite's setup wizard on the clock or at `http://<clock-ip>:2324`, and press **Finish**.
 2. Turn on "Act as the home screen" (`home.enabled`). Without it, Android falls back to the Things launcher.
@@ -220,28 +256,6 @@ adb shell dpm set-device-owner me.jxl.kiosk_satellite/.KioskAdminReceiver
 **Check:** `adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c
 android.intent.category.HOME` ends with `me.jxl.kiosk_satellite/...`; the light sensor changes brightness and the
 volume keys change the volume (Lenovo's Things app handles both).
-
-## 14. `root`: Magisk
-
-Most people expect root. The clock has no userdebug build, so the Smart Display's `adb root` route doesn't exist
-here, and **`adb disable-verity` would likely stop it starting** (LK refuses a vbmeta with verity flags set).
-Magisk patches only `boot_a`; system and verity stay untouched.
-
-1. Patch the stock boot image (`boot-stock.img` from step 4) **on the clock**, as the Magisk app does: push
-   Magisk v31.1's `assets/boot_patch.sh`, `assets/util_functions.sh` and its `lib/armeabi-v7a/` binaries
-   (`libmagiskboot.so` as `magiskboot`, and so on, plus an empty `stub.apk`) to `/data/local/tmp/lck-magisk`,
-   then run `KEEPVERITY=true KEEPFORCEENCRYPT=true LEGACYSAR=true sh boot_patch.sh boot.img` there and pull
-   `new-boot.img`. `LEGACYSAR` matters: LK always passes `skip_initramfs`, and Magisk's kernel patch turns it into
-   `want_initramfs` so its ramdisk loads.
-2. Flash only `boot_a`: start `python fbmulti.py new-boot.img=boot_a`, then enter fastboot. Power-cycle.
-3. `adb install Magisk-v31.1.apk`, then open it. It shows **Requires Additional Setup**: tap OK; the clock
-   restarts. Until then `magiskd` rejects every `su`.
-4. Run `adb shell su -c id` once (it's rejected and logged), open Magisk's **Superuser** tab and switch **Shell**
-   on. Avoid the Modules tab's file picker: it has no way out on the clock's screen (`adb shell input keyevent
-   KEYCODE_BACK` twice gets out). Close the "patch" popup: boot is already patched.
-
-**Check:** `adb shell magisk -v` prints `31.1:MAGISK:R`; `adb shell su -c id` prints `uid=0(root)`; Kiosk Satellite
-is still the home screen; `pidof com.google.android.things.sparrow.oem` prints a number.
 
 ## 15. `verify`: final check
 

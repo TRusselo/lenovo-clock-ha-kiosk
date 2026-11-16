@@ -87,6 +87,18 @@ Afterwards you can remove the USB rule:
 sudo rm /etc/udev/rules.d/51-lck.rules
 ```
 
+## If GitHub limits lookups
+
+The tool asks GitHub for the newest Kiosk Satellite. GitHub allows 60 of those an hour, shared by every device on
+your network, so on a busy network the tool can stop and say when to try again. Or give it a GitHub token (any
+[personal access token](https://github.com/settings/tokens), with no permissions ticked) for that run:
+
+```bash
+GITHUB_TOKEN=<your token> .venv/bin/python -m lck setup
+```
+
+The token goes only to GitHub's API, and isn't saved or logged.
+
 ## Questions or problems?
 
 [Open an issue](../../../issues), or ask in the Smart Display project's

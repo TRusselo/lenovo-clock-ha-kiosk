@@ -20,16 +20,16 @@ from pathlib import Path
 from lck import clock
 from lck.downloads import fetch
 from lck.images import work
-from lck.modes import FASTBOOT_PROMPT, POWER_CYCLE, Mode, current, wait_for_mode
+from lck.modes import FASTBOOT_PROMPT, POWER_CYCLE, Mode, current, stuck_hint, wait_for_mode, wait_to_leave
 from lck.runner import Result
 from lck.steps import Step
 from lck.ui import choose
 from lck.uvrun import uv_path, uv_python
 
 FLASH_SET = {"boot_a", "vendor_a", "vbmeta_a", "system_a", "oem_a", "userdata", "misc"}
-WIPE_WARNING = ("This clock was already unlocked before this run, so it may already be converted. Flashing "
-                "replaces slot A and its user data with the images built from the backup: Kiosk Satellite, "
-                "root and everything set up since go.")
+WIPE_WARNING = ("This clock was already unlocked before this run: it may be converted already, or put back "
+                "to stock with lck restore, which leaves it unlocked. Flashing replaces slot A and its user "
+                "data with the images built from the backup: anything set up on it since goes.")
 
 
 class FlashFailed(Exception):
@@ -74,8 +74,11 @@ def fbmulti(ctx, pairs: list[tuple[Path, str]], *, title: str, sleep=time.sleep)
     log.parent.mkdir(parents=True, exist_ok=True)
     proc = ctx.runner.spawn(args, out_file=log)
     try:
-        if current(ctx) != Mode.FASTBOOT:
+        prompted = current(ctx) != Mode.FASTBOOT
+        if prompted:
             ctx.ui.physical(FASTBOOT_PROMPT)
+        else:
+            ctx.ui.say("The clock is still in fastboot mode from before: nothing to hold.")
         last = None
         while proc.poll() is None and current(ctx) != Mode.FASTBOOT:
             mode = current(ctx)
@@ -83,7 +86,7 @@ def fbmulti(ctx, pairs: list[tuple[Path, str]], *, title: str, sleep=time.sleep)
                 ctx.ui.status(mode.value)
                 last = mode.value
             sleep(0.25)
-        if proc.poll() is None:
+        if proc.poll() is None and prompted:
             ctx.ui.say("Found it. Let go of VOLUME UP. Leave the clock plugged in until this finishes.")
         with ctx.ui.busy(title) as job:
             while proc.poll() is None:
@@ -120,10 +123,19 @@ class FlashStep(Step):
         if not ctx.state.get("unlocked_now"):
             ctx.ui.say("WARNING: " + WIPE_WARNING)
             if not choose(ctx.ui, "Type flash to flash it anyway, or press Enter to stop: ", "flash"):
-                raise FlashFailed("Stopped before flashing. Nothing was changed.")
-        fbmulti(ctx, pairs, title="Flashing slot A, about 4 minutes")
-        ctx.ui.physical(POWER_CYCLE)
-        ctx.ui.say("It reconnects to the Wi-Fi saved in the backup, with adb over Wi-Fi switched on.")
+                hint = stuck_hint(ctx)
+                raise FlashFailed("Stopped before flashing. Nothing was changed." + (" " + hint if hint else ""))
+        fbmulti(ctx, pairs, title="Flashing slot A, about 2 minutes")
+        restart_from_fastboot(ctx)
+        ctx.ui.keep("The clock is starting slot A. It reconnects to the Wi-Fi saved in the backup, with adb over "
+                    "Wi-Fi switched on.")
+
+
+def restart_from_fastboot(ctx) -> None:
+    """The power-cycle box stays up until the clock has really left fastboot: the next
+    step talks to it over Wi-Fi, which only works once Android runs."""
+    ctx.ui.physical(POWER_CYCLE)
+    wait_to_leave(ctx, Mode.FASTBOOT)
 
 
 def _value(out: str, key: str) -> str:
@@ -158,6 +170,8 @@ class UnlockStep(Step):
         return clock.converted(ctx)
 
     def run(self, ctx) -> None:
+        ctx.ui.say("The bootloader's lock can only be read in fastboot mode. If the clock is unlocked already, "
+                   "this only reads it.")
         wait_for_mode(Mode.FASTBOOT, ctx, prompt=FASTBOOT_PROMPT)
         bl, avb = unlocked(ctx)
         if bl and avb:

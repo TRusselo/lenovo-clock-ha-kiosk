@@ -124,7 +124,9 @@ def wait_for_mode(target: Mode, ctx, *, prompt: str, timeout: float = 180,
         if mode == Mode.PRELOADER and target == Mode.BROM and wrong != mode:
             ui.say(PRELOADER_HINT)
             wrong = mode
-        elif mode not in (Mode.NONE, target, Mode.PRELOADER) and wrong != mode:
+        elif (mode not in (Mode.NONE, target, Mode.PRELOADER) and wrong != mode
+              and not (target == Mode.FASTBOOT and mode == Mode.BROM)):
+            # Holding VOLUME UP passes through BROM on the way to fastboot: that's not a mistake.
             ui.redraw()
             ui.say(f"The clock is in {mode.value} mode, not {target.value}. Unplug its power and try again:")
             ui.physical(prompt)
@@ -141,11 +143,34 @@ def wait_for_mode(target: Mode, ctx, *, prompt: str, timeout: float = 180,
         sleep(POLL_SECONDS)
 
 
-BROM_PROMPT = ("Unplug the clock's round power plug. Hold VOLUME UP and VOLUME DOWN together, plug the "
-               "power back in, and keep holding for about 5 seconds, then let go. The screen stays dark. "
-               "It often takes two or three tries.")
-FASTBOOT_PROMPT = ("Unplug the clock's round power plug. Hold VOLUME UP, plug the power back in, and keep "
-                   "holding for about 10 seconds, until the tool says it found the clock. The screen "
-                   "stays dark in this mode.")
-POWER_CYCLE = ("Unplug the clock's round power plug, wait 3 seconds, and plug it back in. Hold no buttons. "
-               "It starts normally: the first start takes a few minutes.")
+BROM_PROMPT = ("For BROM mode: unplug the clock's round power plug. Hold VOLUME UP and VOLUME DOWN together, "
+               "plug the power back in, and keep holding for about 5 seconds, then let go. The screen stays "
+               "dark. It often takes two or three tries.")
+FASTBOOT_PROMPT = ("For fastboot mode: unplug the clock's round power plug. Hold VOLUME UP, plug the power back "
+                   "in, and keep holding for about 10 seconds, until the tool says it found the clock. On "
+                   "the way it passes through BROM mode at 3 to 5 seconds: \"Clock mode: BROM\" while you "
+                   "hold is normal, so keep holding. The screen stays dark.")
+POWER_CYCLE = ("To start the clock normally: Unplug the clock's round power plug, wait 3 seconds, and plug it "
+               "back in. Hold no buttons. The first start takes a few minutes.")
+IN_A_MODE = ("The clock is still in {mode} mode, with its screen dark. To start it normally, Unplug its round "
+             "power plug and plug it back in, holding no buttons.")
+
+
+def wait_to_leave(ctx, mode: Mode, *, sleep=time.sleep) -> None:
+    """Wait, with the box on screen, until the clock has left `mode` (it was power-cycled)."""
+    with ctx.ui.busy(f"Waiting for the clock to leave {mode.value} mode") as job:
+        while current(ctx) == mode:
+            sleep(0.5)
+        job.done(f"The clock left {mode.value} mode")
+
+
+def stuck_hint(ctx=None) -> str:
+    """For a run that stopped: the clock left in BROM or fastboot shows a dark screen."""
+    try:
+        found = ((ctx.state.get("detect") if ctx is not None else None) or detect)()
+    except Exception:
+        return ""
+    for m in (Mode.FASTBOOT, Mode.BROM, Mode.PRELOADER, Mode.DA):
+        if m in found:
+            return IN_A_MODE.format(mode=m.value)
+    return ""

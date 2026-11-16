@@ -32,7 +32,8 @@
       "size": 32332016,
       "unpack": "zip",
       "platform": null,
-      "note": "kortregt's known-good pin. GPL-3.0, run through uv, never bundled. Natural BROM (VOLUME UP and VOLUME DOWN together), kamakiri v1."
+      "note": "kortregt's known-good pin. GPL-3.0, run through uv, never bundled. Natural BROM (VOLUME UP and VOLUME DOWN together), kamakiri v1.",
+      "name": "mtkclient (cd25cf9)"
     },
     {
       "id": "cube-avb-unlock",

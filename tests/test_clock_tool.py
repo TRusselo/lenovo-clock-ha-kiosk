@@ -313,7 +313,7 @@ def test_ip_is_checked():
 def test_steps_are_in_the_manuals_order():
     names = [s.name for s in plan.setup_steps()]
     assert names == ["prerequisites", "backup", "unlock", "images", "userdata", "misc", "flash", "connect",
-                     "degoogle", "keyboard", "kiosk-install", "kiosk-grants", "kiosk-settings", "root",
+                     "root", "degoogle", "keyboard", "kiosk-install", "kiosk-grants", "kiosk-settings",
                      "verify"]
 
 
@@ -329,12 +329,14 @@ def test_flash_asks_first_unless_this_run_unlocked(tmp_path, monkeypatch):
         (tmp_path / "work" / "clock" / "images" / f).write_bytes(b"x")
     flashed = []
     monkeypatch.setattr(flash, "fbmulti", lambda ctx, pairs, **kw: flashed.append(pairs))
-    with pytest.raises(flash.FlashFailed, match="Nothing was changed"):
-        flash.FlashStep().run(ctx_for(tmp_path, ui=FakeUI([""])))
+    with pytest.raises(flash.FlashFailed, match="Nothing was changed.*still in fastboot"):
+        flash.FlashStep().run(ctx_for(tmp_path, ui=FakeUI([""]), detect=lambda: [Mode.FASTBOOT]))
     assert flashed == []
+    monkeypatch.setattr(flash, "restart_from_fastboot", lambda ctx: ctx.ui.physical("replug"))
     flash.FlashStep().run(ctx_for(tmp_path, ui=FakeUI(["flash"])))
     ui = FakeUI()
     flash.FlashStep().run(ctx_for(tmp_path, ui=ui, unlocked_now=True))
+    assert "[physical] replug" in ui.lines
     assert len(flashed) == 2 and not any(l.startswith("[ask]") for l in ui.lines)
 
 
@@ -345,3 +347,104 @@ def test_a_silent_fastboot_never_counts_as_locked(tmp_path):
     runner = FakeRunner({("getvar", "unlocked"): Result(0, "unlocked: yes\n"),
                          ("getvar", "at-vboot-state"): Result(0, "(bootloader) avb-locked: 0\n")})
     assert flash.unlocked(ctx_for(tmp_path, runner=runner)) == (True, True)
+
+
+# --- e2e run 2 findings ------------------------------------------------------
+
+def test_one_bar_for_the_whole_restore(tmp_path):
+    log = tmp_path / "mtk.txt"
+    log.write_text("Wrote a.bin to sector 1\nProgress: 50.0% Write\n")
+    assert mtk.overall(log, [10, 10, 80]) == pytest.approx(15.0)
+    log.write_text("Wrote a\nWrote b\nWrote c\n")
+    assert mtk.overall(log, [10, 10, 80]) == pytest.approx(100.0)
+
+
+def test_a_clock_adb_already_knows_is_found_without_ip(tmp_path):
+    runner = FakeRunner({
+        ("devices",): Result(0, "List of devices attached\nHUA05TEST\tdevice\n10.0.0.9:5555\tdevice\n"
+                                "10.0.0.7:5555\tdevice\n"),
+        ("-s", "10.0.0.9:5555", "shell", "getprop", "ro.product.device"): Result(0, "msm8x53_som\n"),
+        ("-s", "10.0.0.7:5555", "shell", "getprop", "ro.product.device"): Result(0, "mt8167s_som\n"),
+    })
+    assert clock.find_on_wifi(ctx_for(tmp_path, runner=runner)) == "10.0.0.7"
+    assert not any("HUA05TEST" in c for call in runner.calls for c in call)   # the USB device is never asked
+
+
+def test_degoogle_needs_root_and_hides_cast_with_a_boot_script(tmp_path, monkeypatch):
+    from lck import system
+    base = ("-s", "10.0.0.7:5555")
+    no_root = FakeRunner({base + ("get-state",): Result(0, "device\n"),
+                          base + ("shell", "getprop", "ro.product.device"): Result(0, "mt8167s_som\n"),
+                          base + ("shell", "su", "-c", "id"): Result(127, "su: not found\n")})
+    with pytest.raises(clock.SetupFailed, match="needs root"):
+        system.DegoogleStep().run(ctx_for(tmp_path, runner=no_root, ip="10.0.0.7"))
+    lists = [Result(0, f"package:{system.CAST}\npackage:com.google.assistant.core\n"),
+             Result(0, "package:com.google.assistant.core\n")]
+    runner = FakeRunner({base + ("get-state",): Result(0, "device\n"),
+                         base + ("shell", "getprop", "ro.product.device"): Result(0, "mt8167s_som\n"),
+                         base + ("shell", "su", "-c", "id"): Result(0, "uid=0(root)\n"),
+                         base + ("shell", "pm", "list", "packages", "--user", "0"): lists,
+                         base + ("shell", "pm", "list", "packages", "-d", "--user", "0"):
+                             Result(0, "package:com.google.assistant.core\n"),
+                         base + ("shell", "pidof"): Result(0, "123\n")})
+    monkeypatch.setattr(clock, "reboot", lambda ctx, why="": None)
+    ui = FakeUI()
+    system.DegoogleStep().run(ctx_for(tmp_path, runner=runner, ui=ui, ip="10.0.0.7"))
+    su = [c for c in runner.calls if "su" in c and "-c" in c and "id" not in c]
+    assert any(system.HIDE_SCRIPT in " ".join(c) for c in su)
+    assert not any("uninstall" in c for c in runner.calls)
+    assert any("blank" in l for l in ui.lines)
+    assert "mount -o bind /data/adb/empty-cast /oem/app/com.google.android.apps.mediashell" in system.HIDE_CAST
+
+
+def test_root_comes_before_degoogle():
+    names = [s.name for s in plan.setup_steps()]
+    assert names.index("root") < names.index("degoogle")
+
+
+def test_flash_says_found_it_only_after_asking(tmp_path, monkeypatch):
+    monkeypatch.setattr(flash, "uv_path", lambda ctx: Path("uv"))
+    monkeypatch.setattr(flash, "fetch", lambda id_, ctx: Path("fbmulti.py"))
+    runner = SpawnRunner([FakeProc([True, True], 0, "ALL DONE in 3 s", None)])
+    ui = FakeUI()
+    flash.fbmulti(ctx_for(tmp_path, runner=runner, ui=ui, detect=lambda: [Mode.FASTBOOT]),
+                  [(tmp_path / "b.img", "boot_a")], title="t", sleep=lambda s: None)
+    assert not any("Found it" in l or l.startswith("[physical]") for l in ui.lines)
+    assert any("still in fastboot" in l for l in ui.lines)
+
+
+def test_power_cycle_box_waits_for_the_clock_to_leave_fastboot(tmp_path):
+    modes = iter([[Mode.FASTBOOT], [Mode.FASTBOOT], []])
+    ui = FakeUI()
+    c = ctx_for(tmp_path, ui=ui, detect=lambda: next(modes))
+    flash.restart_from_fastboot(c)     # two half-second polls
+    assert ui.lines[0].startswith("[physical] To start the clock normally")
+    assert any("left fastboot" in l for l in ui.lines)
+
+
+def test_the_stop_reason_is_the_last_line_of_the_log(tmp_path):
+    from lck import cli
+    import argparse
+    args = argparse.Namespace(name="clock", workdir=tmp_path, command="setup")
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / "clock.log").write_text("old mtkclient lines\n")
+    cli._log_error(args, "GitHub is limiting lookups, token=abc")
+    last = (tmp_path / "logs" / "clock.log").read_text().splitlines()[-1]
+    assert last.startswith("STOPPED GitHub") and "abc" not in last
+
+
+def test_intro_leaves_out_a_backup_thats_already_there(tmp_path):
+    from lck import cli
+    folder = _zstd_backup(tmp_path)
+    c = ctx_for(tmp_path)
+    assert "35 minutes" not in cli._intro(c) and "already here" in cli._intro(c)
+    c2 = ctx_for(tmp_path / "other")
+    assert "35 minutes" in cli._intro(c2)
+
+
+def test_the_github_token_is_sent_only_when_set(monkeypatch):
+    from lck import kiosk
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    assert kiosk._headers() == {}
+    monkeypatch.setenv("GITHUB_TOKEN", "t0k")
+    assert kiosk._headers() == {"Authorization": "Bearer t0k"}

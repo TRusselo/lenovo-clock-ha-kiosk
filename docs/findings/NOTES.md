@@ -8,7 +8,9 @@ Evidence labels: **Observed** (read on a real clock or its backup), **Reported**
 - MediaTek MT8167S (LK reports MT8167A), 4× Cortex-A35, 1 GB RAM, 8 GB eMMC (Hynix H8G4a2), 480×800 panel
   shown landscape. Android Things 8.1, **32-bit userspace** on a 64-bit 4.4.95 kernel. **Observed.**
 - `ro.treble.enabled=false`, no VNDK, monolithic sepolicy: **no GSIs.** **Observed.**
-- USB-A port is host-only under Android (OTG ID pulled low): **no USB adb.** Fastboot, BROM and the preloader
+- USB-A port is host-only under Android (OTG ID pulled low): **no USB adb.** Since observed (e2e run 2, with
+  root): with the cable that carried fastboot minutes earlier, Android's device controller reports `not attached`
+  and the kernel logs `usb_state<DISCONNECTED>` every 5 s, while `sys.usb.config=adb`. Fastboot, BROM and the preloader
   switch it to device mode. **Reported** (joserodpt, kortregt), consistent with what we saw.
 - Lenovo's Things app (`com.google.android.things.sparrow.oem`, in `/oem/app`) drives the amp, mic ADC, volume
   keys, mute slider and light sensor through the Things peripheral API. **Reported** (S7ruc7ureV01d).
@@ -62,6 +64,13 @@ Evidence labels: **Observed** (read on a real clock or its backup), **Reported**
   (Cast preloading app `2DB7CC49` in a loop), leaving ~118 MB; WebView renderers and then Kiosk Satellite were
   killed. `pm uninstall -k --user 0` works as `shell` (installed=false). `pm hide` needs `MANAGE_USERS`
   (refused). **Observed.**
+- **Correction (e2e run 2, 2026-11-16): the user-0 uninstall of Cast doesn't last.** It answers `Success`, but
+  after every restart Cast is installed for user 0 again (`installed=true`, read before and after two
+  restarts); the earlier observation was read before a restart. Android Things seems to reinstall the `/oem` apps
+  for user 0 at boot (**Guess**: the log doesn't say why). `pm disable` as root doesn't stop it either
+  (persistent: started at boot anyway). **What works, observed:** a Magisk `post-fs-data.d` script that
+  bind-mounts an empty folder over `/oem/app/com.google.android.apps.mediashell`. After a restart Cast isn't
+  listed or running, `sparrow.oem` runs, about 257 MB RAM free. So root comes before the degoogle step.
 - Light sensor and volume keys work under Kiosk Satellite with `sparrow.oem` running: no bootfix needed.
   Kiosk Satellite comes up rotated wrong; its forced-landscape setting fixes it. **Observed** (by the person).
 

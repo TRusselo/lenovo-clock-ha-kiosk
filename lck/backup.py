@@ -8,7 +8,7 @@ password saved on it: it must never be shared.
 
 A backup restores only to the clock it came from: restore first reads the
 clock's partition table and compares its disk GUID and layout. Restore
-writes back what a conversion (or Alpine on slot B) changes, never the
+writes back what a conversion changes, never the
 bootloader chain or the clock's own calibration and keys (lck/mtk.py
 NEVER_WRITE), which nothing here ever writes.
 """
@@ -110,7 +110,8 @@ def backup(ctx, out: Path) -> None:
         raw.unlink(missing_ok=True)
         mtk.run_in_brom(ctx, [f"rf {RAW}", "r preloader boot1.bin --parttype boot1",
                               "r preloader boot2.bin --parttype boot2"],
-                        cwd=out, title="Backing up the clock: the whole disk, about 40 minutes")
+                        cwd=out, title="Backing up the clock: the whole disk, about 35 minutes",
+                        weights=[300, 1, 1])
         if not _complete_dump(out):
             raise BackupMismatch("The backup came out incomplete (the disk image is short, or a boot area "
                                  "is missing). Run the same command again to redo it.")
@@ -219,13 +220,14 @@ def restore(ctx, folder: Path, work: Path) -> None:
     ctx.ui.redraw()
     ctx.ui.say("It's this clock's backup.")
     ctx.ui.say("WARNING: this overwrites the clock's system, both slots, and its user data with the "
-               "backup: Kiosk Satellite, root, Alpine on slot B and everything since go. The bootloader, "
-               "its keys and its calibration are never written. It takes about 40 minutes, in BROM mode "
+               "backup: anything installed or set up since goes. The bootloader, "
+               "its keys and its calibration are never written. It takes about 15 minutes, in BROM mode "
                "again.")
     if not choose(ctx.ui, "Type restore to continue, or press Enter to stop: ", "restore"):
         raise BackupMismatch("Restore cancelled. Nothing was changed.")
     commands = [f"w {n} {files[n].relative_to(work)}" for n in RESTORE_SET]
-    mtk.run_in_brom(ctx, commands, cwd=work, title="Writing the backup to the clock, about 40 minutes")
+    mtk.run_in_brom(ctx, commands, cwd=work, title="Writing the backup to the clock, about 15 minutes",
+                    weights=[files[n].stat().st_size for n in RESTORE_SET])
     ctx.ui.say("Every partition is written.")
 
 
