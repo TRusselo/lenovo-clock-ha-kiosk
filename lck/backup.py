@@ -182,7 +182,9 @@ def read_clock_gpt(ctx, dest: Path) -> bytes:
     """The clock's own partition table, read in BROM (one power-cycle)."""
     dest = Path(dest)
     (dest / "clock-gpt.bin").unlink(missing_ok=True)
-    mtk.run_in_brom(ctx, ["rs 0 34 clock-gpt.bin"], cwd=dest, title="Reading the clock's partition table")
+    # `ro` (bytes), not `rs`: at the pinned commit, rs has no file argument.
+    mtk.run_in_brom(ctx, [f"ro 0 {gpt.GPT_BYTES} clock-gpt.bin"], cwd=dest,
+                    title="Reading the clock's partition table")
     return (dest / "clock-gpt.bin").read_bytes()
 
 

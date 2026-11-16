@@ -23,7 +23,7 @@ PACKAGES = ["pyusb", "pycryptodome", "pycryptodomex", "colorama", "pyserial", "k
 TRIES = 5
 # Commands that write to the clock. Anything else mtkclient can do (writing the whole
 # disk, the preloader, erasing, unlocking seccfg) is refused here.
-READS = {"rf", "rs", "r", "printgpt"}
+READS = {"rf", "ro", "r", "printgpt"}
 NEVER_WRITE = {"preloader", "proinfo", "nvram", "seccfg", "lk_a", "lk_b", "tee_a", "tee_b",
                "oem_bootloader_a", "oem_bootloader_b", "kb", "dkb"}
 _PROGRESS = re.compile(r"(\d+(?:\.\d+)?)% (?:Read|Write)")
@@ -68,7 +68,7 @@ def _ok(text: str, commands: list[str]) -> bool:
         return False
     for c in commands:
         word = c.split()[0]
-        if word in ("rf", "rs", "r") and "Dumped" not in text:
+        if word in ("rf", "ro", "r") and "Dumped" not in text:
             return False
         if word == "w" and f"Wrote {c.split()[2]}" not in text:
             return False
@@ -100,6 +100,9 @@ def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str 
             raise
         if proc.returncode == 0 and _ok(text, commands):
             return text
+        if "error: " in text and "usage:" in text:
+            # mtkclient refused the command line itself: retrying can't help.
+            raise MtkFailed("mtkclient didn't accept its command. Please report this, with the log.")
         if attempt == TRIES:
             raise MtkFailed(f"mtkclient didn't finish after {TRIES} tries. The last lines of its "
                             "output are in the log.")
