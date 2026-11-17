@@ -4,6 +4,23 @@ What changed for people converting a clock. Newest first.
 
 ## Unreleased
 
+### Fixes from the fourth end-to-end run
+- **Switching Google off sticks:** Android saves `pm disable-user` 5 to 10 seconds later, and a restart sooner lost
+  all four. The step now waits until the changes are saved, then restarts. The blank-screen note comes before the
+  restart.
+- **Magisk stays in front:** it's opened once the clock's screen has settled after a restart, and opened again if
+  you press Enter without the grant. Its box says it may open sideways.
+- **The address box says to wait for the clock face first**, right after a flash.
+- **Spinners show their time from 0s,** and open before a slow first check.
+- **BROM:** "Found BROM. Let go of the buttons" as soon as it shows; restore's bar no longer flashes full between
+  partitions; "Found it" in a fastboot wait stays on screen.
+- **Kiosk Satellite copies over with a progress bar** (MB of MB), then installs.
+- **Only the backup zip is kept after a successful setup:** the folder was the same backup twice. It's removed
+  only if the zip holds the same checksums and reads back whole. A later setup unpacks the zip rather than backing
+  up the converted clock over the stock backup, and `lck restore backup/clock` finds the zip.
+- **No `lck lock`:** relocking was looked at and left out. The way back after a lock depends on the leaked unlock
+  credential working a second time, and on where the bootloader keeps the lock state.
+
 ### Fixes from the third end-to-end run
 - **No more false "this computer account isn't allowed" stops** when the clock leaves BROM or fastboot (unplugged,
   or started normally): the tool looks again a moment later. A fastboot wait that sees BROM and then nothing says

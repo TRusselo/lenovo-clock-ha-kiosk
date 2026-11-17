@@ -11,6 +11,7 @@ ramdisk loads. Undo: flash boot-stock.img (kept in the work folder) to boot_a.
 """
 from __future__ import annotations
 
+import re
 import shutil
 import time
 import zipfile
@@ -97,13 +98,33 @@ def magisk_booted(ctx) -> bool:
     return "not found" not in out and "No such file" not in out and out.strip() != ""
 
 
+def front_app(ctx) -> str:
+    m = re.search(r"mResumedActivity: \S+ \S+ (\S+)", shell(ctx, "dumpsys", "activity", "activities", check=False))
+    return m.group(1) if m else ""
+
+
+def settle(ctx, sleep=time.sleep, quiet: float = 10, limit: float = 90) -> None:
+    """After a restart, wait until the screen has stopped changing (Assistant's launcher comes up
+    as Android finishes starting, and covered Magisk in e2e runs 3 and 4)."""
+    end = time.monotonic() + limit
+    last, since = None, time.monotonic()
+    with ctx.ui.busy("Waiting for the clock's screen to settle"):
+        while time.monotonic() < end:
+            app = front_app(ctx)
+            if app != last:
+                last, since = app, time.monotonic()
+            elif app and time.monotonic() - since >= quiet:
+                return
+            sleep(2)
+
+
 def open_magisk(ctx, tries: int = 3, sleep=time.sleep) -> None:
-    """Open the Magisk app on the clock's screen, and check it's there: right after a restart the
-    first launch can be lost (e2e run 3: the Shell box with no Magisk on screen)."""
+    """Open the Magisk app on the clock's screen, and check it's in front: right after a restart
+    the first launch can be lost or covered (e2e runs 3 and 4)."""
     for _ in range(tries):
         shell(ctx, "monkey", "-p", MAGISK_PKG, "-c", "android.intent.category.LAUNCHER", "1", check=False)
         sleep(3)
-        if MAGISK_PKG in shell(ctx, "dumpsys", "activity", "activities", check=False):
+        if front_app(ctx).startswith(MAGISK_PKG):
             return
 
 
@@ -138,7 +159,8 @@ class RootStep(Step):
     def _first_run(self, ctx) -> None:
         old = clock.boot_id(ctx)
         open_magisk(ctx)
-        ctx.ui.physical("Magisk is open on the clock. If it says Requires Additional Setup, tap OK: the clock "
+        ctx.ui.physical("Magisk is open on the clock (it may open sideways: that's fine). If it says Requires "
+                        "Additional Setup, tap OK: the clock "
                         "restarts on its own, and the tool waits for it. If it doesn't ask (its setup was done "
                         "on an earlier try), there's nothing to tap. Close any popup offering to patch: that's "
                         "done already.")
@@ -147,6 +169,7 @@ class RootStep(Step):
                               "you tapped OK, wait for it to restart first. Or type stop: ", "stop"):
                 raise RootFailed("Stopped before Magisk was set up. Run the same command again to carry on.")
         clock.wait_booted(ctx, why="the clock to start")
+        settle(ctx)
         shell(ctx, "su", "-c", "id", check=False, timeout=30)   # asks Magisk, which logs the request
         open_magisk(ctx)
         ctx.ui.physical("Now let adb use root. In Magisk, open the Superuser tab (the shield at the bottom):\n"
@@ -158,3 +181,6 @@ class RootStep(Step):
             if choose(ctx.ui, "Press Enter once Shell is switched on, or type stop: ", "stop"):
                 raise RootFailed("Stopped before root was granted. Run the same command again to carry on.")
             shell(ctx, "su", "-c", "id", check=False, timeout=30)
+            if not clock.has_root(ctx) and not front_app(ctx).startswith(MAGISK_PKG):
+                ctx.ui.say("Magisk isn't on the clock's screen any more: opening it again.")
+                open_magisk(ctx)

@@ -130,6 +130,9 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
             mode = None
         if mode is not None and mode.value != last:
             ctx.ui.status(mode.value)
+            if mode == Mode.BROM:
+                # mtkclient has the clock once BROM shows: the buttons can go now (e2e run 4).
+                ctx.ui.say("Found BROM. Let go of the buttons. Leave the clock plugged in while it connects.")
             last = mode.value
         if mode == Mode.PRELOADER and not hinted:
             ctx.ui.say(PRELOADER_HINT)
@@ -152,7 +155,7 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
             break
         sleep(0.25)
     if proc.poll() is None and last == Mode.DA.value:
-        ctx.ui.say("Found it. Let go of the buttons. Leave the clock plugged in until this finishes.")
+        ctx.ui.say("Connected. Leave the clock plugged in until this finishes.")
         with ctx.ui.busy(title) as job:
             while proc.poll() is None:
                 pct = overall(log, weights or [1] * len(commands))
@@ -177,8 +180,14 @@ def overall(log: Path, weights: list[int]):
     except OSError:
         return None
     # mtkclient prints "Wrote parts/boot_a.bin to sector …" once a partition is written.
-    finished = min(len(re.findall(r"(?:^|\s)(?:Wrote|Dumped) \S", text.replace("\r", "\n"))), len(weights))
-    pct = _last_percent(log) if finished < len(weights) else 100.0
+    flat = text.replace("\r", "\n")
+    ends = list(re.finditer(r"(?:^|\s)(?:Wrote|Dumped) \S", flat))
+    finished = min(len(ends), len(weights))
+    # Only a percent printed after the last finished partition belongs to the running one: the
+    # finished one's own "100.0%" just before its Wrote line flashed the bar to ~100% (e2e run 4).
+    current_part = flat[ends[-1].end():] if ends else flat
+    found = _PROGRESS.findall(current_part)
+    pct = (float(found[-1]) if found else 0.0) if finished < len(weights) else 100.0
     total = sum(weights) or 1
     return 100 * (sum(weights[:finished]) + (weights[finished] * (pct or 0) / 100
                                              if finished < len(weights) else 0)) / total

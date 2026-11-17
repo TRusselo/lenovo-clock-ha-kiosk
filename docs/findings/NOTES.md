@@ -113,3 +113,16 @@ Evidence labels: **Observed** (read on a real clock or its backup), **Reported**
   which reads like a permission problem. Seen 2 of 3 times in e2e run 3. **Observed.**
 - Holding VOLUME UP passes through BROM at 3 to 5 seconds and reaches fastboot at about 8 to 10. Letting go in
   between lets the clock start normally, and then its USB shows nothing. **Observed.**
+
+## Settings writes
+
+- `pm disable-user` answers at once, but `/data/system/users/0/package-restrictions.xml` gets `enabled="3"` 5 to
+  10 s later (0 of 4 at +0 and +5 s, 4 of 4 at +10 s). `adb reboot` inside that window lost all four disables
+  (e2e run 4). **Observed.** The tool waits for the file before restarting.
+
+## Relocking
+
+- Not tried. Lenovo's own unlock zip has a `Lock_batch.bat` (`fastboot oem at-lock-vboot`). The stock backup's
+  `vbmeta_a`/`_b` are signed (SHA512_RSA4096) with flags 0, and its `boot_a`/`_b` are unpatched: the Smart
+  Display's relock gate would pass. Left out because a failed re-unlock may not be undoable by `lck restore` if
+  LK keeps the lock state where BROM writes can't reach (RPMB: **Guess**).

@@ -139,7 +139,8 @@ def wait_for_mode(target: Mode, ctx, *, prompt: str, timeout: float = 180,
             ui.status(mode.value)
             last = mode.value
         if mode == target:
-            ui.say("Found it. Let go of the buttons if you're still holding them.")
+            # keep(): the step ends at once and the next screen would wipe it (e2e run 4).
+            ui.keep(f"Found it, in {target.value} mode. Let go of the buttons if you're still holding them.")
             return
         if mode == Mode.PRELOADER and target == Mode.BROM and wrong != mode:
             ui.say(PRELOADER_HINT)
@@ -164,7 +165,7 @@ def wait_for_mode(target: Mode, ctx, *, prompt: str, timeout: float = 180,
 
 
 BROM_PROMPT = ("For **BROM mode**: unplug the clock's round power plug. Hold VOLUME UP and VOLUME DOWN together, "
-               "plug the power back in, and keep holding for **about 5 seconds**, then let go. The screen stays "
+               "plug the power back in, and keep holding for **about 5 seconds**, or until Clock mode says BROM, then let go. The screen stays "
                "dark. It often takes two or three tries.")
 BROM_AGAIN = ("BROM mode again, this time to write. " + BROM_PROMPT)
 FASTBOOT_PROMPT = ("For **fastboot mode**: unplug the clock's round power plug. Hold VOLUME UP, plug the power back "

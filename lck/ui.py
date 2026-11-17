@@ -315,7 +315,7 @@ class UI:
             i = 0
             while True:
                 took = time.monotonic() - start
-                time_text = f"  {_elapsed(took)}" if took >= 3 else ""
+                time_text = f"  {_elapsed(took)}"     # from 0s: a timer that appears at 3s reads as late
                 note = f"  {job.detail}" if job.detail else ""
                 bar = f"  {self._bar(job.fraction)}" if job.fraction is not None else ""
                 # Stay inside one row: a wrapped line can't be redrawn with \r.

@@ -113,6 +113,8 @@ def _backup(args) -> int:
 
 def _restore(args) -> int:
     folder = args.backup_dir
+    if not folder.exists() and folder.with_name(folder.name + ".zip").is_file():
+        folder = folder.with_name(folder.name + ".zip")    # setup keeps only the zip
     if not folder.exists():
         print(f"Can't restore this backup: no backup at {folder}", file=sys.stderr)
         return 2

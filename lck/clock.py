@@ -120,8 +120,10 @@ def booted(ctx) -> bool:
 
 
 def wait_booted(ctx, timeout=600, why="the clock to start", sleep=time.sleep, ask_after=240) -> None:
-    """Wait until Android has finished starting and adb over Wi-Fi answers. Silent when it has."""
-    if booted(ctx):
+    """Wait until Android has finished starting and adb over Wi-Fi answers. The spinner opens
+    before the slow check, which can hang for 20 s on a clock that's still starting (e2e run 4);
+    a quick look first keeps it silent for a clock that's already up."""
+    if _quick_booted(ctx):
         return
     _wait(ctx, lambda: booted(ctx), timeout, why, sleep, ask_after)
 
@@ -155,6 +157,18 @@ def _wait(ctx, ready, timeout, why, sleep, ask_after, give_up=None) -> bool:
         asked = True
         from lck.system import ask_if_ip_changed
         ask_if_ip_changed(ctx)
+
+
+def _quick_booted(ctx) -> bool:
+    """Already up and connected? Three seconds at most, no adb connect."""
+    target = address(ctx)
+    if not target:
+        return False
+    try:
+        r = _run(ctx, "-s", target, "shell", "getprop", "sys.boot_completed", check=False, timeout=3)
+    except Exception:
+        return False
+    return r.code == 0 and r.out.strip() == "1"
 
 
 def boot_id(ctx) -> str:

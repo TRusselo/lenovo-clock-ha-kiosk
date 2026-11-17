@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
+import time
 from pathlib import Path
 
 import requests
@@ -118,6 +119,34 @@ def fetch_apk(ctx) -> Path:
     return dest
 
 
+REMOTE_APK = "/data/local/tmp/kiosk-satellite.apk"
+
+
+def push_with_progress(ctx, local: Path, remote: str, text: str, sleep=time.sleep) -> None:
+    """adb push in the background, with a bar from the file's size on the clock (e2e run 4: the
+    ~100 MB copy over Wi-Fi is the slow part, and showed only a time)."""
+    total = Path(local).stat().st_size
+    log = ctx.paths.root / "work" / "push-output.txt"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    proc = ctx.runner.spawn([ctx.state["tools"].adb, "-s", clock.address(ctx), "push", local, remote],
+                            out_file=log)
+    try:
+        with ctx.ui.busy(text) as job:
+            while proc.poll() is None:
+                got = shell(ctx, "stat", "-c", "%s", remote, check=False, timeout=15).strip()
+                if got.isdigit():
+                    done = min(int(got), total)
+                    job.note(f"{done >> 20} of {total >> 20} MB", done, total)
+                sleep(2)
+    except BaseException:
+        proc.kill()
+        ctx.runner.finished(proc)
+        raise
+    out = ctx.runner.finished(proc)
+    if proc.returncode != 0:
+        raise KioskError("Copying Kiosk Satellite to the clock stopped: " + (out.strip().splitlines() or ["?"])[-1])
+
+
 class InstallStep(Step):
     name = "kiosk-install"
     title = "Install Kiosk Satellite"
@@ -128,8 +157,12 @@ class InstallStep(Step):
     def run(self, ctx) -> None:
         clock.require_clock(ctx)
         dest = fetch_apk(ctx)
-        with ctx.ui.busy("Installing Kiosk Satellite (about 100 MB, a few minutes over Wi-Fi)"):
-            adb(ctx, "install", "-r", "-g", str(dest), timeout=1200)
+        push_with_progress(ctx, dest, REMOTE_APK, "Copying Kiosk Satellite to the clock over Wi-Fi")
+        with ctx.ui.busy("Installing Kiosk Satellite"):
+            r = shell(ctx, "pm", "install", "-r", "-g", REMOTE_APK, check=False, timeout=600)
+            shell(ctx, "rm", "-f", REMOTE_APK, check=False)
+        if "Success" not in r and not self.done(ctx):
+            raise KioskError("Kiosk Satellite didn't install. The log has Android's reason.")
         if not self.done(ctx):
             raise KioskError("Kiosk Satellite didn't install. The log has Android's reason.")
 

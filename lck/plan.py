@@ -78,11 +78,21 @@ class BackupStep(Step):
                 return
             ctx.ui.say("OK, making the backup.")
         out = backup_dir(ctx)
+        z = out.with_name(out.name + ".zip")
+        if not out.exists() and z.is_file():
+            # A finished setup keeps only the zip. Backing up again now would copy the converted clock
+            # and pack it over the stock backup the setup is built from: unpack the zip instead.
+            folder = backup.unpack(ctx, z, out.parent)
+            problems = backup.verify_backup(folder)
+            if problems:
+                raise backup.BackupMismatch(f"{z} can't be used: " + "; ".join(problems))
+            ctx.ui.keep(f"Using the backup already saved in {z}.")
+            return
         backup.backup(ctx, out)
         z = backup.pack(ctx, out)
         ctx.ui.keep(f"The backup is also saved as one file: {z}. It's named after --name (clock, if you "
-                    "didn't give one). Copy it somewhere safe and keep it private. lck restore takes this "
-                    "file or the folder.")
+                    "didn't give one). Copy it somewhere safe and keep it private. Once setup finishes, only "
+                    "this file is kept: lck restore takes it.")
 
 
 class VerifyStep(Step):
@@ -105,6 +115,7 @@ class VerifyStep(Step):
         if problems:
             raise SetupFailed("Final check failed: " + "; ".join(problems) + ".")
         z = ctx.paths.backup / f"{ctx.state.get('progress_id', 'clock')}.zip"
+        backup.drop_folder(ctx, z.with_suffix(""))
         ip = ctx.state.get("ip")
         nxt = [f"Change Kiosk Satellite's settings from a browser: http://{ip}:2324",
                "If Home Assistant doesn't show the clock, add it: Settings, Devices & services, Kiosk Satellite "

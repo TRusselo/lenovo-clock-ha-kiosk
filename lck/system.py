@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 
 from lck import clock
@@ -42,9 +43,11 @@ def channel(ctx) -> str:
     return lines[-1] if lines else ""
 
 
-def ask_ip(ctx) -> None:
+def ask_ip(ctx, starting: bool = False) -> None:
     ctx.ui.say(WHY_WIFI)
-    ctx.ui.physical(WHERE_IP)
+    # Right after a flash the clock is still dark: "swipe up" means nothing yet (e2e run 4).
+    ctx.ui.physical(("Wait until the clock shows its clock face: the first start takes a few minutes. Then: "
+                     if starting else "") + WHERE_IP)
     while True:
         answer = ctx.ui.ask(ASK_IP).strip()
         if clock.valid_ip(answer):
@@ -113,7 +116,7 @@ class ConnectStep(Step):
 
     def run(self, ctx) -> None:
         if not ctx.state.get("ip"):
-            ask_ip(ctx)
+            ask_ip(ctx, starting=True)
         while not clock.connect(ctx):
             ctx.ui.say(f"No clock answers at {ctx.state['ip']} yet. The first start takes a few minutes; the "
                        "screen shows the clock face when it's ready. Its address can also change after a flash.")
@@ -145,6 +148,28 @@ def _packages(ctx, *flags: str) -> set[str]:
     return {l.split(":", 1)[1].strip() for l in out.splitlines() if l.startswith("package:")}
 
 
+RESTRICTIONS = "/data/system/users/0/package-restrictions.xml"
+
+
+def wait_saved(ctx, packages, timeout=45, sleep=time.sleep) -> bool:
+    """Wait until Android has written the disables to storage. `pm disable-user` answers at once, but
+    the file is written 5 to 10 s later, and `adb reboot` doesn't wait for it: a restart inside that
+    window lost all four disables (e2e run 4). Needs root to read the file."""
+    if not packages:
+        return True
+    end = time.monotonic() + timeout
+    with ctx.ui.busy("Waiting for Android to save the changes") as job:
+        while True:
+            xml = clock.su(ctx, f"cat {RESTRICTIONS}", check=False)
+            saved = [p for p in packages if re.search(rf'<pkg name="{re.escape(p)}"[^>]*enabled="3"', xml)]
+            job.note(f"{len(saved)} of {len(packages)}", len(saved), len(packages))
+            if len(saved) == len(packages):
+                return True
+            if time.monotonic() > end:
+                return False
+            sleep(2)
+
+
 def cast_hidden(ctx) -> bool:
     return CAST not in _packages(ctx) and not shell(ctx, "pidof", CAST, check=False).strip()
 
@@ -173,6 +198,12 @@ class DegoogleStep(Step):
                     shell(ctx, "pm", "disable-user", "--user", "0", p, check=False)
             if CAST in installed:
                 self._install_hide_script(ctx)
+            disabled = [p for p in [*DISABLE, CAST] if p in installed]
+            if not wait_saved(ctx, disabled):
+                ctx.ui.say("Android hasn't saved every change yet; restarting anyway, and checking after.")
+        # Before the restart: a stop at the checks below would otherwise leave it unexplained (e2e run 4).
+        ctx.ui.keep("The clock's screen stays blank, or shows four dots, until Kiosk Satellite is installed in "
+                    "a few steps: that's expected. Swiping up still opens the settings.")
         clock.reboot(ctx, why="the clock to restart with them switched off")
         if CAST in _packages(ctx):
             raise SetupFailed(f"Cast came back after the restart, even with the boot script at {HIDE_SCRIPT}. "
@@ -181,8 +212,6 @@ class DegoogleStep(Step):
         if back:
             raise SetupFailed(f"{', '.join(back)} came back on after the restart. Please report this, with "
                               "the log.")
-        ctx.ui.keep("The clock's screen stays blank, or shows four dots, until Kiosk Satellite is installed in "
-                    "a few steps: that's expected. Swiping up still opens the settings.")
         if not shell(ctx, "pidof", THINGS_APP, check=False).strip():
             ctx.ui.say("Note: Lenovo's Things app (volume keys, light sensor) isn't running yet. It usually "
                        "starts within a minute.")

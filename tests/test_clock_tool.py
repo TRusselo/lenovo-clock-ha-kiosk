@@ -376,6 +376,7 @@ def test_a_clock_adb_already_knows_is_found_without_ip(tmp_path):
 def _degoogle_runner(lists, root=True):
     from lck import system
     base = ("-s", "10.0.0.7:5555")
+    saved = "".join(f'<pkg name="{p}" enabled="3" />' for p in [*system.DISABLE, system.CAST])
     return FakeRunner({base + ("get-state",): Result(0, "device\n"),
                        base + ("shell", "getprop", "ro.product.device"): Result(0, "mt8167s_som\n"),
                        base + ("shell", "su", "-c", "id"): Result(0, "uid=0(root)\n") if root
@@ -385,6 +386,7 @@ def _degoogle_runner(lists, root=True):
                        base + ("shell", "pm", "list", "packages", "--user", "0"): lists,
                        base + ("shell", "pm", "list", "packages", "-d", "--user", "0"):
                            Result(0, "package:com.google.assistant.core\n"),
+                       base + ("shell", "su", "-c", f"'cat {system.RESTRICTIONS}'"): Result(0, saved),
                        base + ("shell", "pidof"): Result(0, "123\n")})
 
 
@@ -621,3 +623,64 @@ def test_bold_survives_a_phrase_wrapped_across_lines(monkeypatch):
     UI(stdout=out).say("Then wait three seconds and then plug the power back in with no buttons held, please.")
     text = out.getvalue()
     assert "\x1b[1mplug the power" in text and "\x1b[1mwith no" in text
+
+
+def test_degoogle_waits_until_android_has_saved_the_disables(tmp_path):
+    # e2e run 4: the file is written 5 to 10 s after pm disable-user; a restart before that lost them.
+    from lck import system
+    base = ("-s", "10.0.0.7:5555")
+    pkgs = ["com.a", "com.b"]
+    runner = FakeRunner({base + ("shell", "su", "-c", f"'cat {system.RESTRICTIONS}'"): [
+        Result(0, '<pkg name="com.a" />'),
+        Result(0, '<pkg name="com.a" enabled="3" /><pkg name="com.b" />'),
+        Result(0, '<pkg name="com.a" enabled="3" /><pkg name="com.b" enabled="3" />')]})
+    c = ctx_for(tmp_path, runner=runner, ip="10.0.0.7")
+    assert system.wait_saved(c, pkgs, sleep=lambda s: None) is True
+    assert len([x for x in runner.calls if "cat" in " ".join(x)]) == 3
+
+
+def test_the_restore_bar_doesnt_flash_full_between_partitions(tmp_path):
+    # e2e run 4: the finished partition's 100% was read as the next one's.
+    log = tmp_path / "mtk.txt"
+    log.write_text("Progress: |##########| 100.0% Write: (0x1/0x1)\rWrote parts/a.bin to sector 1 with sector count 2.\n")
+    assert mtk.overall(log, [1, 9]) == pytest.approx(10.0)
+
+
+def test_kiosk_satellite_is_copied_with_a_bar_then_installed(tmp_path, monkeypatch):
+    from lck import kiosk
+    apk = tmp_path / "ks.apk"
+    apk.write_bytes(b"x" * (3 << 20))
+    monkeypatch.setattr(kiosk, "fetch_apk", lambda ctx: apk)
+    base = ("-s", "10.0.0.7:5555")
+    runner = SpawnRunner([FakeProc([True, True], 0, "1 file pushed", None)])
+    runner.responses.update({
+        base + ("get-state",): Result(0, "device\n"),
+        base + ("shell", "getprop", "ro.product.device"): Result(0, "mt8167s_som\n"),
+        base + ("shell", "stat"): Result(0, str(1 << 20) + "\n"),
+        base + ("shell", "pm", "install"): Result(0, "Success\n"),
+        base + ("shell", "pm", "path"): Result(0, "package:/data/app/ks.apk\n")})
+    monkeypatch.setattr(kiosk.time, "sleep", lambda s: None)
+    ui = FakeUI()
+    kiosk.InstallStep().run(ctx_for(tmp_path, runner=runner, ui=ui, ip="10.0.0.7"))
+    assert runner.spawned[0][-3:] == ["push", str(apk), kiosk.REMOTE_APK]
+    assert any(l == "[note] 1 of 3 MB" for l in ui.lines)
+
+
+def test_only_the_zip_is_kept_and_the_folder_comes_back_from_it(tmp_path):
+    from lck import plan
+    folder = _zstd_backup(tmp_path)
+    c = ctx_for(tmp_path)
+    z = backup.pack(c, folder)
+    (folder / "extra-not-in-zip").write_text("x")       # the zip still holds the same SHA256SUMS
+    assert backup.drop_folder(c, folder) is True and not folder.exists() and z.exists()
+    ui = FakeUI()
+    plan.BackupStep().run(ctx_for(tmp_path, ui=ui))      # no BROM: unpacks the zip instead
+    assert backup.verify_backup(folder) == [] and any("already saved" in l for l in ui.lines)
+
+
+def test_a_folder_isnt_dropped_when_the_zip_differs(tmp_path):
+    folder = _zstd_backup(tmp_path)
+    c = ctx_for(tmp_path)
+    backup.pack(c, folder)
+    (folder / backup.SUMS).write_text((folder / backup.SUMS).read_text() + "0" * 64 + "  other\n")
+    assert backup.drop_folder(c, folder) is False and folder.exists()
