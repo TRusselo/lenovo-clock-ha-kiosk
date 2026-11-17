@@ -198,7 +198,7 @@ class DegoogleStep(Step):
         clock.su(ctx, f"mkdir -p {HIDE_SCRIPT.rsplit('/', 1)[0]} {EMPTY_DIR} && "
                       f"cp /data/local/tmp/hide-cast.sh {HIDE_SCRIPT} && chmod 755 {HIDE_SCRIPT} && "
                       f"rm /data/local/tmp/hide-cast.sh")
-        if "hide-cast.sh" not in clock.su(ctx, f"ls {HIDE_SCRIPT}", check=False):
+        if "present" not in clock.su(ctx, f"test -x {HIDE_SCRIPT} && echo present", check=False):
             raise SetupFailed(f"The boot script didn't land at {HIDE_SCRIPT}. Nothing else was changed; please "
                               "report this, with the log.")
 

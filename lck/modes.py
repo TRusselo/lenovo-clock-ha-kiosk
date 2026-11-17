@@ -121,14 +121,20 @@ def wait_for_mode(target: Mode, ctx, *, prompt: str, timeout: float = 180,
         return
     ui.physical(prompt)
     start, last, hinted, wrong = clock(), None, False, None
+    brom_seen = None          # when BROM was last seen, in a wait for fastboot
     while True:
         mode = current(ctx)
-        if (target == Mode.FASTBOOT and last == Mode.BROM.value and mode == Mode.NONE):
-            # BROM, then nothing: the buttons were let go on the way, and the clock started
-            # normally. Once Android runs, its USB shows nothing at all.
+        if target == Mode.FASTBOOT and mode == Mode.BROM:
+            brom_seen = clock()
+        if (target == Mode.FASTBOOT and brom_seen is not None and mode == Mode.NONE
+                and clock() - brom_seen >= STARTED_AFTER):
+            # BROM, then nothing for a long while: there's always a short gap with nothing on USB
+            # between BROM and fastboot, but this long means the buttons were let go on the way and
+            # the clock started normally. Once Android runs, its USB shows nothing at all.
             ui.redraw()
             ui.say(STARTED_NORMALLY)
             ui.physical(prompt)
+            brom_seen = None
         if mode.value != last:
             ui.status(mode.value)
             last = mode.value
@@ -167,6 +173,7 @@ FASTBOOT_PROMPT = ("For **fastboot mode**: unplug the clock's round power plug. 
                    "hold is normal, so keep holding. The screen stays dark.")
 POWER_CYCLE = ("To start the clock normally: unplug the clock's round power plug, wait 3 seconds, and plug it "
                "back in. Hold no buttons. The first start takes a few minutes.")
+STARTED_AFTER = 15         # seconds with nothing on USB after BROM, in a fastboot wait
 STARTED_NORMALLY = ("The clock went past BROM and started normally: the buttons were let go too soon, and once "
                     "Android runs, the clock's USB shows nothing. Try again, holding VOLUME UP the whole time:")
 IN_A_MODE = ("The clock is still in {mode} mode, with its screen dark. To start the clock normally: Unplug "

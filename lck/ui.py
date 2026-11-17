@@ -45,9 +45,11 @@ DEVICE = "Lenovo Smart Clock"
 # Bold, always, wherever they're asked for: buttons and keys, and what the person does with the
 # power plug (one rule here, so no message can miss it). Anything else to stand out, such as the
 # mode and the time a box waits for, is marked **like this** in the message itself.
-_BUTTONS = re.compile(r"\b(VOLUME UP|VOLUME DOWN|FINISH|Finish|Enter|[Uu]nplug(?:ged)?|[Rr]eplug|"
-                      r"plug (?:it|the power|its power|the clock) back in|plug it in|[Hh]old(?:ing)? no buttons|"
-                      r"(?:with )?no buttons held|[Ll]et go(?: of the buttons| of VOLUME UP)?)\b")
+# \s+ between words: the text is wrapped first, so a phrase can break across lines.
+_BUTTONS = re.compile(r"\b(VOLUME\s+UP|VOLUME\s+DOWN|FINISH|Finish|Enter|[Uu]nplug(?:ged)?|[Rr]eplug|"
+                      r"plug\s+(?:it|the\s+power|its\s+power|the\s+clock)\s+back\s+in|plug\s+it\s+in|"
+                      r"[Hh]old(?:ing)?\s+no\s+buttons|(?:with\s+)?no\s+buttons\s+held|"
+                      r"[Ll]et\s+go(?:\s+of\s+the\s+buttons|\s+of\s+VOLUME\s+UP)?)\b")
 _MARKED = re.compile(r"\*\*(.+?)\*\*", re.S)
 
 

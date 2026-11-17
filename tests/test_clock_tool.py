@@ -380,8 +380,8 @@ def _degoogle_runner(lists, root=True):
                        base + ("shell", "getprop", "ro.product.device"): Result(0, "mt8167s_som\n"),
                        base + ("shell", "su", "-c", "id"): Result(0, "uid=0(root)\n") if root
                        else Result(127, "su: not found\n"),
-                       base + ("shell", "su", "-c", f"'ls {system.HIDE_SCRIPT}'"):
-                           Result(0, system.HIDE_SCRIPT + "\n"),
+                       base + ("shell", "su", "-c", f"'test -x {system.HIDE_SCRIPT} && echo present'"):
+                           Result(0, "present\n"),
                        base + ("shell", "pm", "list", "packages", "--user", "0"): lists,
                        base + ("shell", "pm", "list", "packages", "-d", "--user", "0"):
                            Result(0, "package:com.google.assistant.core\n"),
@@ -523,12 +523,33 @@ def test_a_clock_leaving_a_mode_isnt_a_permission_problem():
         detect(scan=lambda: [(Mode.BROM, 1, 2)], access=lambda b, a: False, sleep=lambda s: None)
 
 
-def test_brom_then_nothing_while_waiting_for_fastboot_says_it_started_normally(tmp_path):
-    seq = iter([[], [Mode.BROM], [], [Mode.FASTBOOT]])
+def _fastboot_wait(tmp_path, seq):
+    """seq: (seconds, modes) pairs, one per poll."""
+    import itertools
+    polls = iter(seq)
+    now = [0]
+
+    def detect():
+        secs, modes = next(polls)
+        now[0] = secs
+        return modes
     ui = FakeUI()
-    c = ctx_for(tmp_path, ui=ui, detect=lambda: next(seq))
-    wait_for_mode(Mode.FASTBOOT, c, prompt="Hold VOLUME UP", sleep=lambda s: None)
-    assert any("started normally" in l for l in ui.lines)
+    c = ctx_for(tmp_path, ui=ui, detect=detect)
+    wait_for_mode(Mode.FASTBOOT, c, prompt="Hold VOLUME UP", sleep=lambda s: None, clock=lambda: now[0])
+    return ui
+
+
+def test_the_normal_gap_between_brom_and_fastboot_isnt_called_a_mistake(tmp_path):
+    # e2e run 3's good holds: BROM, a few seconds of nothing while LK starts, then fastboot.
+    ui = _fastboot_wait(tmp_path, [(0, []), (0, []), (3, [Mode.BROM]), (5, []), (8, []), (10, [Mode.FASTBOOT])])
+    assert not any("started normally" in l for l in ui.lines)
+    assert "Found it" in ui.lines[-1]
+
+
+def test_brom_then_nothing_for_long_says_it_started_normally(tmp_path):
+    ui = _fastboot_wait(tmp_path, [(0, []), (0, []), (3, [Mode.BROM]), (6, []), (12, []), (19, []), (25, []),
+                                   (40, [Mode.FASTBOOT])])
+    assert sum("started normally" in l for l in ui.lines) == 1
 
 
 def test_a_resumed_root_step_doesnt_patch_or_flash_again(tmp_path, monkeypatch):
@@ -584,3 +605,19 @@ def test_su_gets_the_whole_command_as_one_argument(tmp_path):
     runner = FakeRunner()
     clock.su(ctx_for(tmp_path, runner=runner, ip="10.0.0.7"), "mkdir -p /a && cp b /a/b")
     assert runner.calls[-1][-3:] == ["su", "-c", "'mkdir -p /a && cp b /a/b'"]
+
+
+def test_bold_survives_a_phrase_wrapped_across_lines(monkeypatch):
+    import io
+    import lck.ui as ui_mod
+    from lck.ui import UI
+
+    class Tty(io.StringIO):
+        def isatty(self):
+            return True
+    monkeypatch.setattr(ui_mod, "_windows_vt_on", lambda: True)
+    monkeypatch.setattr(ui_mod.shutil, "get_terminal_size", lambda fallback=None: __import__("os").terminal_size((40, 24)))
+    out = Tty()
+    UI(stdout=out).say("Then wait three seconds and then plug the power back in with no buttons held, please.")
+    text = out.getvalue()
+    assert "\x1b[1mplug the power" in text and "\x1b[1mwith no" in text

@@ -126,16 +126,21 @@ def wait_booted(ctx, timeout=600, why="the clock to start", sleep=time.sleep, as
     _wait(ctx, lambda: booted(ctx), timeout, why, sleep, ask_after)
 
 
-def _wait(ctx, ready, timeout, why, sleep, ask_after) -> None:
+def _wait(ctx, ready, timeout, why, sleep, ask_after, give_up=None) -> bool:
     """One spinner from the start of the wait to its end, with the real time. The clock's address
     can change at any restart: after `ask_after` seconds with no answer, the person is asked
     whether it has, and the wait goes on at the new one."""
     start = time.monotonic()
     asked = False
     while True:
-        with ctx.ui.busy(f"Waiting for {why}"):
+        with ctx.ui.busy(f"Waiting for {why}") as job:
             while not ready():
                 waited = time.monotonic() - start
+                if give_up is not None and waited > give_up:
+                    # A wait that's allowed to end without its event (Magisk may not ask for its
+                    # setup): ends as paused, in yellow, not as a failure in red.
+                    job.pause(f"No restart after {int(give_up)} seconds")
+                    return False
                 if waited > timeout:
                     raise SetupFailed(f"The clock didn't come back on Wi-Fi at {ctx.state.get('ip')} within "
                                       f"{timeout // 60} minutes. If its screen shows the clock face, find its "
@@ -146,7 +151,7 @@ def _wait(ctx, ready, timeout, why, sleep, ask_after) -> None:
                     break
                 sleep(3)
             else:
-                return
+                return True
         asked = True
         from lck.system import ask_if_ip_changed
         ask_if_ip_changed(ctx)
@@ -161,10 +166,11 @@ def boot_id(ctx) -> str:
 
 
 def wait_restarted(ctx, old_id: str, timeout=600, why="the clock to restart", sleep=time.sleep,
-                   ask_after=240) -> None:
+                   ask_after=240, give_up=None) -> bool:
     """Wait for a restart (the tool's own, or Magisk's), then for Android: done when the clock
-    answers with a new boot id."""
-    _wait(ctx, lambda: booted(ctx) and boot_id(ctx) not in ("", old_id), timeout, why, sleep, ask_after)
+    answers with a new boot id. With give_up, False after that long without one."""
+    return _wait(ctx, lambda: booted(ctx) and boot_id(ctx) not in ("", old_id), timeout, why, sleep,
+                 ask_after, give_up)
 
 
 def find_on_wifi(ctx) -> str | None:

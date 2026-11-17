@@ -142,9 +142,7 @@ class RootStep(Step):
                         "restarts on its own, and the tool waits for it. If it doesn't ask (its setup was done "
                         "on an earlier try), there's nothing to tap. Close any popup offering to patch: that's "
                         "done already.")
-        try:
-            clock.wait_restarted(ctx, old, timeout=90, why="the clock to restart, after you tap OK")
-        except SetupFailed:
+        if not clock.wait_restarted(ctx, old, why="the clock to restart, after you tap OK", give_up=90):
             if choose(ctx.ui, "No restart yet. If Magisk didn't ask for extra setup, press Enter to carry on; if "
                               "you tapped OK, wait for it to restart first. Or type stop: ", "stop"):
                 raise RootFailed("Stopped before Magisk was set up. Run the same command again to carry on.")
