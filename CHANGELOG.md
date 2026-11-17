@@ -5,11 +5,12 @@ What changed for people converting a clock. Newest first.
 ## Unreleased
 
 ### Fixes from the fifth end-to-end run
-- **Wi-Fi is checked before anything is written.** After the flash the clock can only be reached over Wi-Fi,
-  and the only network it knows is the one saved in its backup. A clock never set up on Wi-Fi has none. The tool
-  now checks the backup first and, if there's none, asks for your Wi-Fi name and password (not shown as you type,
-  never logged) and adds them to the user data; or it stops so you can set the clock up with the Google Home app.
-  Adding the network is untested on a clock so far.
+- **Wi-Fi is a full stop in step 1.** After the flash the clock can only be reached over Wi-Fi, on the network
+  it's connected to when backed up: a network it once saved isn't enough. Step 1 asks: "Is the clock booted and
+  connected to Wi-Fi? If not, connect it to Wi-Fi using the Google Home app before typing YES. Or you can type
+  NO, and enter your Wi-Fi name and password in the tool later." With NO, the name and password (not shown as you
+  type, never logged, never saved in the progress file) are added to the clock's user data before the flash. With
+  YES, the backup is still checked for a saved network. Adding the network is untested on a clock so far.
 - **One "On the clock" box at a time:** a new box in the same step redraws the screen, and carries over what was
   said just before it.
 - **Magisk:** **tap OK** in bold, "Touch nothing else", 3 minutes for its restart; the sideways note in the Shell

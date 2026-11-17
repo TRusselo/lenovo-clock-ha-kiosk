@@ -130,10 +130,18 @@ class ImagesStep(Step):
 
 
 def ensure_wifi(ctx) -> None:
-    """Before anything is written: the clock has to come up on Wi-Fi after the flash, since once
-    Android runs its USB is host-only, and the only network it knows is the one saved in the backup's
-    user data. With none (a clock never set up), ask for one, or for the Google Home route (e2e
-    run 5). The answer stays in memory: a later run asks again."""
+    """Before anything is written, and again at the userdata step: the clock has to come back on a
+    working Wi-Fi after the flash, since once Android runs its USB is host-only. Step 1 asked (the
+    answer is saved in the progress file); NO means the name and password are asked for now. With
+    YES, the backup is still checked for a saved network, in case. The password stays in memory: a
+    later run asks again."""
+    if ctx.state.get("wifi_new"):
+        return
+    ready = ctx.state.get("wifi_ready")
+    if ready is False:
+        from lck.system import ask_wifi
+        ctx.state["wifi_new"] = ask_wifi(ctx)
+        return
     if ctx.state.get("wifi_checked"):
         return
     folder = backup_dir(ctx)
@@ -149,20 +157,12 @@ def ensure_wifi(ctx) -> None:
         ctx.runner.run(["e2fsck", "-fy", probe], check=False, timeout=1800)
         count = userdata.wifi_networks(str(probe))
         probe.unlink(missing_ok=True)
+    ctx.state["wifi_checked"] = True
     if count:
-        ctx.state["wifi_checked"] = True
         return
     from lck.system import ask_wifi
-    ssid_psk = ask_wifi(ctx)
-    if ssid_psk is None:
-        raise ImagesFailed(GOOGLE_HOME_WAY.format(folder=folder))
-    ctx.state["wifi_new"] = ssid_psk
-    ctx.state["wifi_checked"] = True
-
-
-GOOGLE_HOME_WAY = ("Nothing was changed. Set the clock up on your Wi-Fi with the Google Home app. Then put the old "
-                   "backup aside, so setup makes a new one with the Wi-Fi in it: rename {folder} (and its .zip, "
-                   "if there is one) to another name, and run the same command again.")
+    ctx.ui.say("The backup has no saved Wi-Fi network at all, so the clock couldn't come back after the flash.")
+    ctx.state["wifi_new"] = ask_wifi(ctx)
 
 
 class UserdataStep(Step):

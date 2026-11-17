@@ -82,6 +82,8 @@ def _load(ctx: Context) -> list[str]:
     if data.get("ip") and "ip" not in ctx.state:
         # The clock's Wi-Fi address, from the connect step (--ip overrides it).
         ctx.state["ip"] = data["ip"]
+    if "wifi_ready" in data and "wifi_ready" not in ctx.state:
+        ctx.state["wifi_ready"] = data["wifi_ready"]     # step 1's YES or NO (never the password)
     if data.get("serial"):
         # Later steps refuse a different clock than the one this progress is for.
         ctx.state["bound_serial"] = data["serial"]
@@ -94,6 +96,7 @@ def _save(ctx: Context, done: list[str]) -> None:
     tmp = f.with_suffix(".tmp")
     serial = ctx.state.get("serial") or ctx.state.get("bound_serial")
     tmp.write_text(json.dumps({"done": done, "serial": serial, "ip": ctx.state.get("ip"),
+                               "wifi_ready": ctx.state.get("wifi_ready"),
                                "version": __version__}, indent=1),
                    encoding="utf-8")
     os.replace(tmp, f)

@@ -59,6 +59,10 @@ class PrerequisitesStep(Step):
         mtk.prepare(ctx)
         with ctx.ui.busy("Downloading Kiosk Satellite"):
             fetch_apk(ctx)
+        # A full stop before the clock is touched: is it on a Wi-Fi that works now?
+        if ctx.state.get("wifi_ready") is None and not clock.converted(ctx):
+            from lck.system import ask_wifi_ready
+            ctx.state["wifi_ready"] = ask_wifi_ready(ctx)
 
 
 class BackupStep(Step):

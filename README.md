@@ -50,8 +50,8 @@ The tool checks the model over Wi-Fi before it changes anything there, and refus
 - The clock, its round barrel-plug power supply, and a **USB A-to-A** cable (straight-through, no chip in the
   middle) for the USB port on its back
 - A **Linux** computer with about 20 GB free (Windows and macOS aren't supported yet)
-- Your Wi-Fi: the clock reconnects to the network it was set up on. A clock never set up on Wi-Fi: the tool
-  asks for your Wi-Fi name and password before it changes anything, or you set it up with the Google Home app first
+- Your Wi-Fi: the clock booted and connected to it (set it up with the Google Home app), or your Wi-Fi name
+  and password to type into the tool. The first thing it asks is which
 - Home Assistant
 - About 1 hour 30 minutes; most of it is waiting
 
@@ -118,7 +118,7 @@ Android. So the tool:
   tool shows which mode the clock is in;
 - **can stop and pick up again.** Run the same command again to continue where it stopped.
 
-Your Wi-Fi comes back from the backup (or the tool adds the one you type, if the backup has none), and the Home Assistant sign-in is done **on the clock itself** or in a
+Your Wi-Fi comes back from the backup (or the tool adds the one you type), and the Home Assistant sign-in is done **on the clock itself** or in a
 browser at an address the tool shows you. The tool never sees your passwords.
 
 **To make another backup** at any time: `.venv/bin/python -m lck backup --name clock-later`.

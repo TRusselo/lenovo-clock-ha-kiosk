@@ -737,11 +737,35 @@ def test_no_saved_wifi_asks_before_anything_is_written(tmp_path, monkeypatch):
     folder = _zstd_backup(tmp_path)
     monkeypatch.setattr(images, "backup_dir", lambda ctx: folder)
     monkeypatch.setattr(userdata, "wifi_networks", lambda img: 0)
-    ui = FakeUI(["1", "Home", "secret-pass"])
+    ui = FakeUI(["Home", "secret-pass"])
     c = ctx_for(tmp_path, ui=ui, runner=FakeRunner())
     images.ensure_wifi(c)
     assert c.state["wifi_new"] == ("Home", "secret-pass")
     assert not any("secret-pass" in l for l in ui.lines)        # the password is never echoed back
-    ui2 = FakeUI(["2"])
-    with pytest.raises(images.ImagesFailed, match="Google Home"):
-        images.ensure_wifi(ctx_for(tmp_path, ui=ui2, runner=FakeRunner()))
+
+
+def test_step_one_asks_yes_or_no_and_no_means_typed_later(tmp_path, monkeypatch):
+    # The person's design (after e2e run 5): a saved network isn't a working one; ask first.
+    from lck import images, system
+    monkeypatch.setattr(images, "backup_dir", lambda ctx: tmp_path / "none")
+    ui = FakeUI(["maybe", "no"])
+    c = ctx_for(tmp_path, ui=ui)
+    assert system.ask_wifi_ready(c) is False
+    assert any("Google Home app before typing YES" in l for l in ui.lines)
+    c.state["wifi_ready"] = False
+    c.ui = FakeUI(["Home", "secret-pass"])
+    images.ensure_wifi(c)                                      # no backup look: asked straight away
+    assert c.state["wifi_new"] == ("Home", "secret-pass")
+    assert system.ask_wifi_ready(ctx_for(tmp_path, ui=FakeUI(["YES"]))) is True
+
+
+def test_the_wifi_answer_is_saved_but_never_the_password(tmp_path):
+    import json
+    from lck.steps import _save, _load
+    c = ctx_for(tmp_path, wifi_ready=False, wifi_new=("Home", "secret-pass"))
+    _save(c, ["prerequisites"])
+    text = (c.paths.progress / "clock.json").read_text()
+    assert "secret-pass" not in text and json.loads(text)["wifi_ready"] is False
+    c2 = ctx_for(tmp_path)
+    _load(c2)
+    assert c2.state["wifi_ready"] is False

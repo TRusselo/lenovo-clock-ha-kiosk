@@ -58,26 +58,37 @@ def ask_ip(ctx, starting: bool = False) -> None:
         ctx.ui.say(f'"{answer}" isn\'t an address. It looks like four numbers with dots between them.')
 
 
-NO_WIFI = ("The backup has no saved Wi-Fi network: this clock was never set up on Wi-Fi. After the flash the tool "
-           "can only reach the clock over Wi-Fi (once Android runs, its USB port can't be used), so it needs one. "
-           "Two ways:\n"
-           "  1. Type your Wi-Fi name and password here. The tool adds them to the clock's user data before "
-           "flashing. They're kept only in the work folder's images, like a backup's own Wi-Fi password, and "
-           "never logged.\n"
-           "  2. Or set the clock up with the Google Home app first, then run setup again with a new backup.")
+WIFI_WHY = ("After the flash, the tool can only reach the clock over Wi-Fi (once Android runs, its USB port can't "
+            "be used), on the network the clock is connected to when it's backed up. A network it saved once isn't "
+            "enough: it has to be one that works now.")
+WIFI_QUESTION = ("Is the clock booted and connected to Wi-Fi? If not, connect it to Wi-Fi using the Google Home app "
+                 "before typing YES. Or you can type NO, and enter your Wi-Fi name and password in the tool later: ")
+WIFI_SAVED_BACKUP = ("A backup of this clock is already saved, and the setup uses it as it is: answer for the clock as "
+                     "it was when that backup was made.")
+
+
+def ask_wifi_ready(ctx) -> bool:
+    """Step 1's full stop (the person's wording, e2e run 5): YES, the clock is on a working Wi-Fi now
+    (the backup then carries it), or NO, the Wi-Fi name and password are typed in later."""
+    ctx.ui.say(WIFI_WHY)
+    from lck.images import backup_dir
+    from lck import backup
+    if not backup.verify_backup(backup_dir(ctx)):
+        ctx.ui.say(WIFI_SAVED_BACKUP)
+    while True:
+        answer = ctx.ui.ask(WIFI_QUESTION).strip().lower()
+        if answer in ("yes", "y"):
+            return True
+        if answer in ("no", "n"):
+            return False
+        ctx.ui.say(f'"{answer}" isn\'t an answer here. Type YES or NO.')
 
 
 def ask_wifi(ctx):
-    """(name, password), or None for the Google Home way."""
+    """The Wi-Fi name and password, for the clock's user data."""
     from lck.userdata import UserdataFailed, check_wifi
-    ctx.ui.say(NO_WIFI)
-    while True:
-        answer = ctx.ui.ask("Type 1 to enter your Wi-Fi here, or 2 to use the Google Home app: ").strip()
-        if answer == "2":
-            return None
-        if answer == "1":
-            break
-        ctx.ui.say(f'"{answer}" isn\'t an answer here. Type 1 or 2.')
+    ctx.ui.say("The clock needs a Wi-Fi network to come back on after the flash. The tool adds yours to its user "
+               "data. The password is kept only in the work folder's images, like a backup's own, and never logged.")
     while True:
         ssid = ctx.ui.ask("Wi-Fi name (as your phone shows it, 2.4 GHz if your router has two): ").strip()
         psk = ctx.ui.ask_secret("Wi-Fi password (not shown as you type): ")
