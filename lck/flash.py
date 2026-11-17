@@ -131,6 +131,17 @@ class FlashStep(Step):
                     "Wi-Fi switched on.")
 
 
+def flash_userdata(ctx) -> None:
+    """Write only the user data again (new Wi-Fi details), then start the clock."""
+    folder = work(ctx) / "images"
+    pairs = [(p, "userdata") for p in _pieces(folder, "userdata")]
+    if not pairs:
+        raise FlashFailed("The user data images aren't there. Run the setup again from the userdata step.")
+    ctx.ui.say("Now only the user data goes on the clock again.")
+    fbmulti(ctx, pairs, title="Flashing the user data")
+    restart_from_fastboot(ctx)
+
+
 def restart_from_fastboot(ctx) -> None:
     """The power-cycle box stays up until the clock has really left fastboot: the next
     step talks to it over Wi-Fi, which only works once Android runs."""

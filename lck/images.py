@@ -206,6 +206,13 @@ class UserdataStep(Step):
                    f"{out}, keep that folder private.")
 
 
+def rebuild_userdata(ctx) -> None:
+    """The user data again, from the backup, with the Wi-Fi now in ctx.state (a mistyped one is gone)."""
+    for old in (work(ctx) / "images").glob("userdata_chunk.*"):
+        old.unlink()
+    UserdataStep().run(ctx)
+
+
 class MiscStep(Step):
     name = "misc"
     title = "Boot slot A next, and block Google's updates"

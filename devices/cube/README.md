@@ -105,7 +105,9 @@ As a check: `debugfs -R "cat /misc/wifi/WifiConfigStore.xml" userdata_copy.img |
 `e2fsck -fy` on a copy) must be 1 or more. If it's 0, either set the clock up with the Google Home app and back it
 up again, or add a WPA2 network to the copy: `lck.userdata.add_wifi(img, name, password)` writes one entry in the
 shape Android Things 8.1 uses (owner 1000:1000, mode 0600, label `wifi_data_file`). **Untested on a clock:** the
-tool's own way of adding it, found needed in e2e run 5.
+tool's own way of adding it, found needed in e2e run 5. If a typed network was wrong, the clock starts but has no
+IP address: rebuild this step's image from the backup with the right details and flash only `userdata` again
+(`lck` offers this at the address question: type wifi).
 
 
 ```bash

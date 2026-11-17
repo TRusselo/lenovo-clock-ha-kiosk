@@ -81,6 +81,10 @@ reach it there.
 
 ## If the clock doesn't come back
 
+If you typed your Wi-Fi name and password into the tool and the clock shows its clock face but no IP address (under
+Settings, About device), the details were probably mistyped. At the address question, type wifi to enter them
+again: the tool writes only the user data again, in fastboot mode.
+
 The clock's address can change whenever it restarts. When it's slow to answer, the tool asks whether it has, so you
 can type the new one and carry on. It never relies on an address from an earlier run without checking it.
 

@@ -11,6 +11,9 @@ What changed for people converting a clock. Newest first.
   NO, and enter your Wi-Fi name and password in the tool later." With NO, the name and password (not shown as you
   type, never logged, never saved in the progress file) are added to the clock's user data before the flash. With
   YES, the backup is still checked for a saved network. Adding the network is untested on a clock so far.
+- **Mistyped Wi-Fi can be fixed in place:** if the clock starts but can't join (no IP address under About device),
+  type wifi at the address question to enter the name and password again. The tool rebuilds the user data from
+  the backup with only the new details and writes just that again, in fastboot mode, as many times as needed.
 - **One "On the clock" box at a time:** a new box in the same step redraws the screen, and carries over what was
   said just before it.
 - **Magisk:** **tap OK** in bold, "Touch nothing else", 3 minutes for its restart; the sideways note in the Shell

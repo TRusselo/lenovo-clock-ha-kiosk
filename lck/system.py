@@ -38,6 +38,7 @@ WHERE_IP_FIRST_START = ("Wait until the clock shows its clock face: the first st
                         "up from the bottom, tap the gear (Settings), then About device: the address is under IP "
                         "address. Your router's list of devices shows it too.")
 ASK_IP = "Type the clock's address, such as 10.0.0.23, and press Enter: "
+ASK_IP_OR_WIFI = "Type the clock's address, such as 10.0.0.23, or type wifi to enter the Wi-Fi again: "
 
 
 def channel(ctx) -> str:
@@ -46,15 +47,30 @@ def channel(ctx) -> str:
     return lines[-1] if lines else ""
 
 
-def ask_ip(ctx, starting: bool = False) -> None:
+WIFI_RETRY = ("If the clock shows its clock face but has no address (About device shows no IP address), it didn't "
+              "get on the Wi-Fi: the name or password may have been mistyped. Type wifi to enter them again: the "
+              "tool rebuilds the user data and writes only that again, in fastboot mode.")
+
+
+def typed_wifi(ctx) -> bool:
+    return ctx.state.get("wifi_ready") is False or bool(ctx.state.get("wifi_new"))
+
+
+def ask_ip(ctx, starting: bool = False) -> str | None:
+    """Sets ctx.state["ip"]. Returns "wifi" when the person wants to re-enter typed Wi-Fi details."""
     ctx.ui.say(WHY_WIFI)
     # Right after a flash the clock is still dark: "swipe up" means nothing yet (e2e run 4).
     ctx.ui.physical(WHERE_IP_FIRST_START if starting else WHERE_IP)
+    retry = typed_wifi(ctx)
+    if retry:
+        ctx.ui.say(WIFI_RETRY)
     while True:
-        answer = ctx.ui.ask(ASK_IP).strip()
+        answer = ctx.ui.ask(ASK_IP_OR_WIFI if retry else ASK_IP).strip()
+        if retry and answer.lower() == "wifi":
+            return "wifi"
         if clock.valid_ip(answer):
             ctx.state["ip"] = answer
-            return
+            return None
         ctx.ui.say(f'"{answer}" isn\'t an address. It looks like four numbers with dots between them.')
 
 
@@ -159,12 +175,22 @@ class ConnectStep(Step):
 
     def run(self, ctx) -> None:
         if not ctx.state.get("ip"):
-            ask_ip(ctx, starting=True)
+            while ask_ip(ctx, starting=True) == "wifi":
+                self._retry_wifi(ctx)
         while not clock.connect(ctx):
             ctx.ui.say(f"No clock answers at {ctx.state['ip']} yet. The first start takes a few minutes; the "
                        "screen shows the clock face when it's ready. Its address can also change after a flash.")
             ctx.ui.physical(WHERE_IP)
-            answer = ctx.ui.ask("Type its address if it's different, or press Enter to keep waiting: ").strip()
+            retry = typed_wifi(ctx)
+            if retry:
+                ctx.ui.say(WIFI_RETRY)
+            answer = ctx.ui.ask("Type its address if it's different, " + ("type wifi to enter the Wi-Fi again, "
+                                if retry else "") + "or press Enter to keep waiting: ").strip()
+            if retry and answer.lower() == "wifi":
+                self._retry_wifi(ctx)
+                while ask_ip(ctx, starting=True) == "wifi":
+                    self._retry_wifi(ctx)
+                continue
             if clock.valid_ip(answer):
                 ctx.state["ip"] = answer
                 continue
@@ -172,7 +198,8 @@ class ConnectStep(Step):
                 clock.wait_booted(ctx, timeout=300)
             except SetupFailed:
                 ctx.state["ip"] = None
-                ask_ip(ctx)
+                while ask_ip(ctx) == "wifi":
+                    self._retry_wifi(ctx)
         clock.require_clock(ctx)
         clock.wait_booted(ctx)
         slot = clock.prop(ctx, "ro.boot.slot_suffix")
@@ -183,6 +210,18 @@ class ConnectStep(Step):
             raise SetupFailed("Google's updates aren't blocked (the update channel isn't none-channel). Run "
                               "the setup again from the misc step: lck setup --from misc")
         ctx.ui.say(f"Connected to the clock at {ctx.state['ip']}, on slot A, with Google's updates blocked.")
+
+
+    @staticmethod
+    def _retry_wifi(ctx) -> None:
+        """Mistyped Wi-Fi: the clock started but can't join, so there's no adb. New details, the user
+        data rebuilt from the backup with only them, and only userdata written again."""
+        from lck import images
+        from lck.flash import flash_userdata
+        ctx.state["wifi_new"] = ask_wifi(ctx)
+        images.rebuild_userdata(ctx)
+        flash_userdata(ctx)
+        ctx.state["ip"] = None
 
 
 def _packages(ctx, *flags: str) -> set[str]:

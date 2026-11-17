@@ -769,3 +769,31 @@ def test_the_wifi_answer_is_saved_but_never_the_password(tmp_path):
     c2 = ctx_for(tmp_path)
     _load(c2)
     assert c2.state["wifi_ready"] is False
+
+
+def test_mistyped_wifi_can_be_entered_again_and_only_userdata_is_rewritten(tmp_path, monkeypatch):
+    # Tristyn: a mistyped name or password leaves the clock off Wi-Fi, with no adb: loop until it joins.
+    from lck import images, system
+    import lck.flash as flash_mod
+    rebuilt, flashed = [], []
+    monkeypatch.setattr(images, "rebuild_userdata", lambda ctx: rebuilt.append(ctx.state["wifi_new"]))
+    monkeypatch.setattr(flash_mod, "flash_userdata", lambda ctx: flashed.append(1))
+    monkeypatch.setattr(clock, "connect", lambda ctx, tries=3: True)
+    monkeypatch.setattr(clock, "require_clock", lambda ctx: None)
+    monkeypatch.setattr(clock, "wait_booted", lambda ctx, **kw: None)
+    monkeypatch.setattr(clock, "prop", lambda ctx, name: "_a")
+    monkeypatch.setattr(system, "channel", lambda ctx: "none-channel")
+    ui = FakeUI(["wifi", "Home", "right-password", "10.0.0.9"])
+    c = ctx_for(tmp_path, ui=ui, wifi_ready=False, wifi_new=("Hmoe", "wrong-password"))
+    system.ConnectStep().run(c)
+    assert rebuilt == [("Home", "right-password")] and flashed == [1]
+    assert c.state["ip"] == "10.0.0.9"
+    assert any("mistyped" in l for l in ui.lines)
+
+
+def test_no_wifi_retry_offered_when_the_backup_brought_the_wifi(tmp_path, monkeypatch):
+    from lck import system
+    ui = FakeUI(["wifi", "10.0.0.9"])
+    c = ctx_for(tmp_path, ui=ui, wifi_ready=True)
+    assert system.ask_ip(c) is None and c.state["ip"] == "10.0.0.9"
+    assert not any("mistyped" in l for l in ui.lines)
