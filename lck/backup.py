@@ -22,6 +22,7 @@ import zipfile
 from pathlib import Path
 
 from lck import gpt, mtk
+from lck.modes import BROM_AGAIN
 from lck.ui import choose
 
 RAW = "full_user.bin"
@@ -226,7 +227,9 @@ def restore(ctx, folder: Path, work: Path) -> None:
     if not choose(ctx.ui, "Type restore to continue, or press Enter to stop: ", "restore"):
         raise BackupMismatch("Restore cancelled. Nothing was changed.")
     commands = [f"w {n} {files[n].relative_to(work)}" for n in RESTORE_SET]
+    ctx.ui.redraw()
     mtk.run_in_brom(ctx, commands, cwd=work, title="Writing the backup to the clock, about 15 minutes",
+                    prompt=BROM_AGAIN,
                     weights=[files[n].stat().st_size for n in RESTORE_SET])
     ctx.ui.say("Every partition is written.")
 

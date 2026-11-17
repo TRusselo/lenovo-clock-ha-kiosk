@@ -90,7 +90,9 @@ sudo rm /etc/udev/rules.d/51-lck.rules
 ## If GitHub limits lookups
 
 The tool asks GitHub for the newest Kiosk Satellite. GitHub allows 60 of those an hour, shared by every device on
-your network, so on a busy network the tool can stop and say when to try again. Or give it a GitHub token (any
+your network, so on a busy network the tool can stop and say when to try again. A VPN changes the address GitHub sees: turning
+it on or off, or picking another location, often gets you going at once (a shared VPN address may have the 60
+used up already). Or give it a GitHub token (any
 [personal access token](https://github.com/settings/tokens), with no permissions ticked) for that run:
 
 ```bash

@@ -380,14 +380,16 @@ def _degoogle_runner(lists, root=True):
                        base + ("shell", "getprop", "ro.product.device"): Result(0, "mt8167s_som\n"),
                        base + ("shell", "su", "-c", "id"): Result(0, "uid=0(root)\n") if root
                        else Result(127, "su: not found\n"),
+                       base + ("shell", "su", "-c", f"'ls {system.HIDE_SCRIPT}'"):
+                           Result(0, system.HIDE_SCRIPT + "\n"),
                        base + ("shell", "pm", "list", "packages", "--user", "0"): lists,
                        base + ("shell", "pm", "list", "packages", "-d", "--user", "0"):
                            Result(0, "package:com.google.assistant.core\n"),
                        base + ("shell", "pidof"): Result(0, "123\n")})
 
 
-def test_degoogle_disables_before_it_uninstalls(tmp_path, monkeypatch):
-    # Uninstalling alone didn't last (e2e run 2); disable first, then uninstall, did (first clock).
+def test_degoogle_hides_cast_with_the_boot_script_in_one_restart(tmp_path, monkeypatch):
+    # e2e runs 2 and 3: uninstalling Cast for user 0 didn't last, with or without disabling first.
     from lck import system
     cast = f"package:{system.CAST}\npackage:com.google.assistant.core\n"
     runner = _degoogle_runner([Result(0, cast), Result(0, "package:com.google.assistant.core\n")])
@@ -395,37 +397,31 @@ def test_degoogle_disables_before_it_uninstalls(tmp_path, monkeypatch):
     monkeypatch.setattr(clock, "reboot", lambda ctx, why="": reboots.append(why))
     ui = FakeUI()
     system.DegoogleStep().run(ctx_for(tmp_path, runner=runner, ui=ui, ip="10.0.0.7"))
-    flat = [" ".join(c) for c in runner.calls]
-    first_disable = next(i for i, c in enumerate(flat) if f"disable-user --user 0 {system.CAST}" in c)
-    uninstall = next(i for i, c in enumerate(flat) if f"uninstall -k --user 0 {system.CAST}" in c)
-    assert first_disable < uninstall and len(reboots) == 1
-    assert not any(system.HIDE_SCRIPT in c for c in flat)        # the fallback wasn't needed
+    assert len(reboots) == 1
+    assert not any("uninstall" in c for c in runner.calls)
+    # e2e run 3: the chained command must reach su -c as ONE quoted argument, or only mkdir runs as root.
+    su = [c for c in runner.calls if c[-3:-1] == ["su", "-c"] and "cp " in c[-1]]
+    assert len(su) == 1 and su[0][-1].startswith("'") and su[0][-1].endswith("'") and "&&" in su[0][-1]
     assert any("blank" in l for l in ui.lines)
+    assert "mount -o bind /data/adb/empty-cast /oem/app/com.google.android.apps.mediashell" in system.HIDE_CAST
 
 
-def test_degoogle_tries_the_first_clocks_restart_if_cast_comes_back(tmp_path, monkeypatch):
+def test_degoogle_without_root_stops_before_changing_anything(tmp_path, monkeypatch):
     from lck import system
-    cast = f"package:{system.CAST}\n"
-    runner = _degoogle_runner([Result(0, cast), Result(0, cast), Result(0, "")])
-    reboots = []
-    monkeypatch.setattr(clock, "reboot", lambda ctx, why="": reboots.append(why))
-    ui = FakeUI()
-    system.DegoogleStep().run(ctx_for(tmp_path, runner=runner, ui=ui, ip="10.0.0.7"))
-    assert len(reboots) == 3 and any("first clock's way" in l for l in ui.lines)
-    assert not any(system.HIDE_SCRIPT in " ".join(c) for c in runner.calls)
+    monkeypatch.setattr(clock, "reboot", lambda ctx, why="": None)
+    runner = _degoogle_runner([Result(0, f"package:{system.CAST}\n")], root=False)
+    with pytest.raises(clock.SetupFailed, match="needs root"):
+        system.DegoogleStep().run(ctx_for(tmp_path, runner=runner, ip="10.0.0.7"))
+    assert not any("disable-user" in c for c in runner.calls)
 
 
-def test_degoogle_falls_back_to_the_boot_script_with_root(tmp_path, monkeypatch):
+def test_degoogle_says_when_cast_still_comes_back(tmp_path, monkeypatch):
     from lck import system
     cast = f"package:{system.CAST}\n"
     monkeypatch.setattr(clock, "reboot", lambda ctx, why="": None)
-    runner = _degoogle_runner([Result(0, cast), Result(0, cast), Result(0, cast), Result(0, "")])
-    system.DegoogleStep().run(ctx_for(tmp_path, runner=runner, ip="10.0.0.7"))
-    assert any(system.HIDE_SCRIPT in " ".join(c) for c in runner.calls)
-    runner = _degoogle_runner([Result(0, cast)], root=False)
-    with pytest.raises(clock.SetupFailed, match="needs root"):
+    runner = _degoogle_runner([Result(0, cast)])
+    with pytest.raises(clock.SetupFailed, match="Cast came back"):
         system.DegoogleStep().run(ctx_for(tmp_path, runner=runner, ip="10.0.0.7"))
-    assert "mount -o bind /data/adb/empty-cast /oem/app/com.google.android.apps.mediashell" in system.HIDE_CAST
 
 
 def test_root_comes_before_degoogle():
@@ -482,8 +478,11 @@ def test_the_github_token_is_sent_only_when_set(monkeypatch):
 
 
 def test_an_old_address_that_no_longer_answers_is_dropped(tmp_path, monkeypatch):
+    import itertools
     import json
     monkeypatch.setattr(clock.time, "sleep", lambda s: None)
+    ticks = itertools.count(0, 30)          # the one-minute grace passes in two looks
+    monkeypatch.setattr(clock.time, "monotonic", lambda: next(ticks))
     from lck import system
     from lck.steps import _load
     c = ctx_for(tmp_path, ui=FakeUI([""]), runner=FakeRunner(default=Result(1, "")))
@@ -513,3 +512,75 @@ def test_a_new_address_after_a_restart_is_asked_for_and_used(tmp_path, monkeypat
     clock.wait_booted(c, sleep=lambda s: None)
     assert c.state["ip"] == "10.0.0.8" and "10.0.0.5" in seen
     assert any("may have changed" in l for l in ui.lines)
+
+
+def test_a_clock_leaving_a_mode_isnt_a_permission_problem():
+    # e2e run 3: the device file was gone (clock unplugged, or past BROM), read as "not allowed".
+    from lck.modes import detect
+    scans = iter([[(Mode.FASTBOOT, 1, 2)], []])
+    assert detect(scan=lambda: next(scans), access=lambda b, a: False, sleep=lambda s: None) == []
+    with pytest.raises(UsbNoPermission):
+        detect(scan=lambda: [(Mode.BROM, 1, 2)], access=lambda b, a: False, sleep=lambda s: None)
+
+
+def test_brom_then_nothing_while_waiting_for_fastboot_says_it_started_normally(tmp_path):
+    seq = iter([[], [Mode.BROM], [], [Mode.FASTBOOT]])
+    ui = FakeUI()
+    c = ctx_for(tmp_path, ui=ui, detect=lambda: next(seq))
+    wait_for_mode(Mode.FASTBOOT, c, prompt="Hold VOLUME UP", sleep=lambda s: None)
+    assert any("started normally" in l for l in ui.lines)
+
+
+def test_a_resumed_root_step_doesnt_patch_or_flash_again(tmp_path, monkeypatch):
+    from lck import root
+    base = ("-s", "10.0.0.7:5555")
+    runner = FakeRunner({base + ("get-state",): Result(0, "device\n"),
+                         base + ("shell", "getprop", "ro.product.device"): Result(0, "mt8167s_som\n"),
+                         base + ("shell", "su", "-c", "id"): [Result(13, "Permission denied\n"),
+                                                              Result(13, "Permission denied\n"),
+                                                              Result(0, "uid=0(root)\n")],
+                         base + ("shell", "pm", "path"): Result(0, "package:/data/app/magisk.apk\n")})
+    monkeypatch.setattr(root, "stock_boot", lambda ctx: Path("boot-stock.img"))
+    monkeypatch.setattr(root, "patch", lambda ctx, b: pytest.fail("patched again"))
+    monkeypatch.setattr(root, "fbmulti", lambda *a, **k: pytest.fail("flashed again"))
+    monkeypatch.setattr(root.RootStep, "_first_run", lambda self, ctx: None)
+    ui = FakeUI()
+    root.RootStep().run(ctx_for(tmp_path, runner=runner, ui=ui, ip="10.0.0.7"))
+    assert any("already running" in l for l in ui.lines)
+
+
+def test_marked_words_are_bold_on_a_terminal_and_plain_elsewhere(monkeypatch):
+    import io
+    import lck.ui as ui_mod
+    from lck.ui import UI
+
+    class Tty(io.StringIO):
+        def isatty(self):
+            return True
+    monkeypatch.setattr(ui_mod, "_windows_vt_on", lambda: True)
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    out = Tty()
+    UI(stdout=out).physical("For **fastboot mode**: unplug it, then plug it back in. Hold no buttons.")
+    text = out.getvalue()
+    assert "**" not in text and "\x1b[1mfastboot mode" in text and "\x1b[1munplug" in text
+    assert "\x1b[1mplug it back in" in text and "\x1b[1mHold no buttons" in text
+    plain_out = io.StringIO()
+    UI(stdout=plain_out).physical("For **fastboot mode**: hold")
+    assert "**" not in plain_out.getvalue() and "fastboot mode" in plain_out.getvalue()
+
+
+def test_the_log_tail_is_only_this_run(tmp_path, capsys):
+    from lck import cli
+    import argparse
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / "clock.log").write_text(
+        f"old restore line\n{cli.RUN_MARK} restore\nolder\n{cli.RUN_MARK} setup\nthis run's line\nSTOPPED x\n")
+    cli._print_log_tail(argparse.Namespace(name="clock", workdir=tmp_path))
+    err = capsys.readouterr().err
+    assert "this run's line" in err and "older" not in err and "old restore" not in err
+
+
+def test_su_gets_the_whole_command_as_one_argument(tmp_path):
+    runner = FakeRunner()
+    clock.su(ctx_for(tmp_path, runner=runner, ip="10.0.0.7"), "mkdir -p /a && cp b /a/b")
+    assert runner.calls[-1][-3:] == ["su", "-c", "'mkdir -p /a && cp b /a/b'"]

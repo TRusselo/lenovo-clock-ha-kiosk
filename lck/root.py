@@ -12,6 +12,7 @@ ramdisk loads. Undo: flash boot-stock.img (kept in the work folder) to boot_a.
 from __future__ import annotations
 
 import shutil
+import time
 import zipfile
 from pathlib import Path
 
@@ -88,6 +89,24 @@ def patch(ctx, boot: Path) -> Path:
     return out
 
 
+def magisk_booted(ctx) -> bool:
+    """The patched boot image is running: Magisk's su exists, even before adb is granted root
+    (it answers "Permission denied", not "not found"). A resumed root step then needs no new
+    patch and no fastboot trip (e2e run 3)."""
+    out = shell(ctx, "su", "-c", "id", check=False, timeout=30)
+    return "not found" not in out and "No such file" not in out and out.strip() != ""
+
+
+def open_magisk(ctx, tries: int = 3, sleep=time.sleep) -> None:
+    """Open the Magisk app on the clock's screen, and check it's there: right after a restart the
+    first launch can be lost (e2e run 3: the Shell box with no Magisk on screen)."""
+    for _ in range(tries):
+        shell(ctx, "monkey", "-p", MAGISK_PKG, "-c", "android.intent.category.LAUNCHER", "1", check=False)
+        sleep(3)
+        if MAGISK_PKG in shell(ctx, "dumpsys", "activity", "activities", check=False):
+            return
+
+
 class RootStep(Step):
     name = "root"
     title = "Root the clock with Magisk"
@@ -98,11 +117,14 @@ class RootStep(Step):
     def run(self, ctx) -> None:
         clock.require_clock(ctx)
         boot = stock_boot(ctx)
-        patched = patch(ctx, boot)
-        ctx.ui.say("Now the patched boot image goes on slot A. Only boot_a is written.")
-        fbmulti(ctx, [(patched, "boot_a")], title="Flashing the patched boot image")
-        restart_from_fastboot(ctx)
-        clock.wait_booted(ctx, why="the clock to start with Magisk")
+        if magisk_booted(ctx):
+            ctx.ui.say("Magisk's patched boot image is already running: no new patch or flash needed.")
+        else:
+            patched = patch(ctx, boot)
+            ctx.ui.say("Now the patched boot image goes on slot A. Only boot_a is written.")
+            fbmulti(ctx, [(patched, "boot_a")], title="Flashing the patched boot image")
+            restart_from_fastboot(ctx)
+            clock.wait_booted(ctx, why="the clock to start with Magisk")
         if "package:" not in shell(ctx, "pm", "path", MAGISK_PKG, check=False):
             with ctx.ui.busy("Installing the Magisk app"):
                 clock.adb(ctx, "install", "-r", fetch("magisk", ctx), timeout=300)
@@ -115,19 +137,20 @@ class RootStep(Step):
 
     def _first_run(self, ctx) -> None:
         old = clock.boot_id(ctx)
-        shell(ctx, "monkey", "-p", MAGISK_PKG, "-c", "android.intent.category.LAUNCHER", "1", check=False)
-        ctx.ui.physical("Magisk is open on the clock. It says Requires Additional Setup: tap OK. The clock "
-                        "restarts on its own, and the tool waits for it. Close any popup offering to patch: "
-                        "that's done already.")
+        open_magisk(ctx)
+        ctx.ui.physical("Magisk is open on the clock. If it says Requires Additional Setup, tap OK: the clock "
+                        "restarts on its own, and the tool waits for it. If it doesn't ask (its setup was done "
+                        "on an earlier try), there's nothing to tap. Close any popup offering to patch: that's "
+                        "done already.")
         try:
-            clock.wait_restarted(ctx, old, timeout=300, why="the clock to restart, after you tap OK")
+            clock.wait_restarted(ctx, old, timeout=90, why="the clock to restart, after you tap OK")
         except SetupFailed:
-            if choose(ctx.ui, "The clock hasn't restarted. If Magisk didn't ask for extra setup, press Enter to "
-                              "carry on, or type stop: ", "stop"):
+            if choose(ctx.ui, "No restart yet. If Magisk didn't ask for extra setup, press Enter to carry on; if "
+                              "you tapped OK, wait for it to restart first. Or type stop: ", "stop"):
                 raise RootFailed("Stopped before Magisk was set up. Run the same command again to carry on.")
         clock.wait_booted(ctx, why="the clock to start")
         shell(ctx, "su", "-c", "id", check=False, timeout=30)   # asks Magisk, which logs the request
-        shell(ctx, "monkey", "-p", MAGISK_PKG, "-c", "android.intent.category.LAUNCHER", "1", check=False)
+        open_magisk(ctx)
         ctx.ui.physical("Now let adb use root. In Magisk, open the Superuser tab (the shield at the bottom):\n"
                         "  1. Tap + (add)\n"
                         "  2. Tick Shell in the list\n"

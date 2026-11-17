@@ -85,11 +85,19 @@ def usb_scan() -> list[tuple[Mode, int, int]]:
             if (d.idVendor, d.idProduct) in USB_IDS]
 
 
-def detect(scan=usb_scan, access=usb_access) -> list[Mode]:
+def detect(scan=usb_scan, access=usb_access, sleep=time.sleep) -> list[Mode]:
+    """The clock's modes on USB. A device file that can't be opened is only a permission
+    problem if the device is still there a moment later: when the clock leaves a mode (it
+    started normally, or was unplugged as asked) between the listing and the check, its file
+    is already gone (e2e run 3: two false stops)."""
     found = scan()
-    for mode, bus, addr in found:
-        if mode in (Mode.BROM, Mode.FASTBOOT) and not access(bus, addr):
+    refused = [(m, b, a) for m, b, a in found if m in (Mode.BROM, Mode.FASTBOOT) and not access(b, a)]
+    if refused:
+        sleep(1)
+        again = scan()
+        if any(d in again and not access(d[1], d[2]) for d in refused):
             raise UsbNoPermission(NO_PERMISSION)
+        found = again
     return [m for m, _b, _a in found]
 
 
@@ -115,6 +123,12 @@ def wait_for_mode(target: Mode, ctx, *, prompt: str, timeout: float = 180,
     start, last, hinted, wrong = clock(), None, False, None
     while True:
         mode = current(ctx)
+        if (target == Mode.FASTBOOT and last == Mode.BROM.value and mode == Mode.NONE):
+            # BROM, then nothing: the buttons were let go on the way, and the clock started
+            # normally. Once Android runs, its USB shows nothing at all.
+            ui.redraw()
+            ui.say(STARTED_NORMALLY)
+            ui.physical(prompt)
         if mode.value != last:
             ui.status(mode.value)
             last = mode.value
@@ -143,15 +157,18 @@ def wait_for_mode(target: Mode, ctx, *, prompt: str, timeout: float = 180,
         sleep(POLL_SECONDS)
 
 
-BROM_PROMPT = ("For BROM mode: unplug the clock's round power plug. Hold VOLUME UP and VOLUME DOWN together, "
-               "plug the power back in, and keep holding for about 5 seconds, then let go. The screen stays "
+BROM_PROMPT = ("For **BROM mode**: unplug the clock's round power plug. Hold VOLUME UP and VOLUME DOWN together, "
+               "plug the power back in, and keep holding for **about 5 seconds**, then let go. The screen stays "
                "dark. It often takes two or three tries.")
-FASTBOOT_PROMPT = ("For fastboot mode: unplug the clock's round power plug. Hold VOLUME UP, plug the power back "
-                   "in, and keep holding for about 10 seconds, until the tool says it found the clock. On "
+BROM_AGAIN = ("BROM mode again, this time to write. " + BROM_PROMPT)
+FASTBOOT_PROMPT = ("For **fastboot mode**: unplug the clock's round power plug. Hold VOLUME UP, plug the power back "
+                   "in, and keep holding for **about 10 seconds**, until the tool says it found the clock. On "
                    "the way it passes through BROM mode at 3 to 5 seconds: \"Clock mode: BROM\" while you "
                    "hold is normal, so keep holding. The screen stays dark.")
-POWER_CYCLE = ("To start the clock normally: Unplug the clock's round power plug, wait 3 seconds, and plug it "
+POWER_CYCLE = ("To start the clock normally: unplug the clock's round power plug, wait 3 seconds, and plug it "
                "back in. Hold no buttons. The first start takes a few minutes.")
+STARTED_NORMALLY = ("The clock went past BROM and started normally: the buttons were let go too soon, and once "
+                    "Android runs, the clock's USB shows nothing. Try again, holding VOLUME UP the whole time:")
 IN_A_MODE = ("The clock is still in {mode} mode, with its screen dark. To start the clock normally: Unplug "
              "its round power plug and plug it back in, holding no buttons.")
 

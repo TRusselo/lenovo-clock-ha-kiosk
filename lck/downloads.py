@@ -159,7 +159,7 @@ def fetch(entry_id: str, ctx) -> Path:
         verified.write_text(e["sha256"])
     if not e["unpack"]:
         return file
-    with _busy(ctx, f"Unpacking {file.name}"):
+    with _busy(ctx, f"Unpacking {e.get('name') or file.name}"):
         _unpack(e["unpack"], file, out)
     done_marker.write_text(e["sha256"])
     return out

@@ -4,6 +4,21 @@ What changed for people converting a clock. Newest first.
 
 ## Unreleased
 
+### Fixes from the third end-to-end run
+- **No more false "this computer account isn't allowed" stops** when the clock leaves BROM or fastboot (unplugged,
+  or started normally): the tool looks again a moment later. A fastboot wait that sees BROM and then nothing says
+  the clock started normally, and to hold VOLUME UP the whole time.
+- **Cast:** the Magisk boot script is the only thing seen to keep it off, so the step uses it directly: one
+  restart. The script is now installed correctly (the whole command reaches `su -c` as one argument).
+- **The root step picks up where it stopped:** no new patch and fastboot trip when Magisk's boot image is running,
+  no endless wait when Magisk doesn't ask for its extra setup, and Magisk is opened before each box.
+- **Restart spinners** run from the moment of the restart, with the real time.
+- **Bold:** the mode and the time a box waits for, and always unplug, plug it back in and replug.
+- **Restore's second BROM box** says it's the second one, to write, on a fresh screen.
+- The failure screen shows only this run's log lines; the GitHub message suggests switching the VPN; a saved
+  address gets a minute to answer before the tool asks; "Setting up mtkclient's packages" comes after its
+  download; What's next says how to add the clock in Home Assistant if it doesn't show up.
+
 ### Fixes from the second end-to-end run
 - **Cast stays off.** Removing it for user 0 on its own only lasted until the next restart. The step now disables it
   before removing it for user 0, as on the first clock where it stayed off. If it comes back, it tries the first

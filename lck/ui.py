@@ -42,9 +42,18 @@ _BOLD, _PURPLE, _TITLE, _YELLOW, _RED, _CYAN, _NOW, _DIM, _RESET = (
 CLEAR = "\x1b[H\x1b[2J\x1b[3J"     # the screen and the scrollback: no banner or old screens above
 TITLE = "Lenovo Smart Clock {to} Home Assistant"
 DEVICE = "Lenovo Smart Clock"
-# Buttons and keys the user presses: bold wherever they're asked for.
-_BUTTONS = re.compile(r"\b(VOLUME UP|VOLUME DOWN|FINISH|Finish|Enter|Unplug|Hold no buttons|holding no buttons|"
-                      r"[Ll]et go(?: of the buttons| of VOLUME UP)?)\b")
+# Bold, always, wherever they're asked for: buttons and keys, and what the person does with the
+# power plug (one rule here, so no message can miss it). Anything else to stand out, such as the
+# mode and the time a box waits for, is marked **like this** in the message itself.
+_BUTTONS = re.compile(r"\b(VOLUME UP|VOLUME DOWN|FINISH|Finish|Enter|[Uu]nplug(?:ged)?|[Rr]eplug|"
+                      r"plug (?:it|the power|its power|the clock) back in|plug it in|[Hh]old(?:ing)? no buttons|"
+                      r"(?:with )?no buttons held|[Ll]et go(?: of the buttons| of VOLUME UP)?)\b")
+_MARKED = re.compile(r"\*\*(.+?)\*\*", re.S)
+
+
+def plain(text: str) -> str:
+    """The text without its **marks**, for output that has no bold."""
+    return _MARKED.sub(lambda m: m.group(1), text)
 
 
 def _old_windows_console() -> bool:
@@ -107,9 +116,11 @@ class UI:
         return "\n".join(out)
 
     def _buttons(self, text: str, colour: str = "") -> str:
-        """Buttons and keys to press in bold, then back to the surrounding colour."""
+        """Buttons, keys, the power plug and **marked** words in bold, then back to the
+        surrounding colour."""
         if not self._colour():
-            return text
+            return plain(text)
+        text = _MARKED.sub(lambda m: f"{_BOLD}{m.group(1)}{_RESET}{colour}", text)
         return _BUTTONS.sub(lambda m: f"{_BOLD}{m.group(0)}{_RESET}{colour}", text)
 
     def redraw(self) -> None:
@@ -132,8 +143,7 @@ class UI:
 
     def say(self, text: str) -> None:
         self._end_status()
-        if self._live():
-            text = self._buttons(self._wrap(text))
+        text = self._buttons(self._wrap(text)) if self._live() else plain(text)
         self.stdout.write(f"{text}\n")
         self.stdout.flush()
 
@@ -146,7 +156,7 @@ class UI:
             self.stdout.write(f"\n  {head}\n{self._buttons(self._wrap(text, '    '))}\n")
         else:
             bar = "=" * 72
-            self.stdout.write(f"\n{bar}\n  DO THIS ON THE CLOCK:\n  {text}\n{bar}\n")
+            self.stdout.write(f"\n{bar}\n  DO THIS ON THE CLOCK:\n  {plain(text)}\n{bar}\n")
         self.stdout.flush()
 
     def title(self, text: str) -> None:
@@ -208,7 +218,7 @@ class UI:
                 out.append("  " + self._paint(_DIM, f"{sym['todo']} {t}") + "\n")
         out.append("\n")
         for text in self._intro + self._kept:
-            out.append(self._wrap(text) + "\n\n")
+            out.append(self._buttons(self._wrap(text)) + "\n\n")
         self._kept = []
         self.stdout.write("".join(out))
         self.stdout.flush()
@@ -245,12 +255,13 @@ class UI:
         if self._live():
             self.stdout.write(f"\n  {self._paint(_TITLE, title)}\n")
             for line in lines:
-                self.stdout.write(self._wrap(line, "    ").replace("    ", f"  {self._paint(_PURPLE, self._symbols()['todo'])} ", 1) + "\n")
+                self.stdout.write(self._buttons(self._wrap(line, "    ")).replace(
+                    "    ", f"  {self._paint(_PURPLE, self._symbols()['todo'])} ", 1) + "\n")
             self.stdout.flush()
             return
         self.stdout.write(f"\n{self._paint(_TITLE, title)}\n")
         for line in lines:
-            self.stdout.write(f"  - {line}\n")
+            self.stdout.write(f"  - {plain(line)}\n")
         self.stdout.flush()
 
     def _colour(self) -> bool:
@@ -268,9 +279,9 @@ class UI:
         if self._live():
             self.stdout.write(f"\n{_YELLOW}{self._buttons(self._wrap(text), _YELLOW)}{_RESET}\n")
         elif self._colour():
-            self.stdout.write(f"\n\x1b[1;33m{text}\x1b[0m\n")
+            self.stdout.write(f"\n\x1b[1;33m{plain(text)}\x1b[0m\n")
         else:
-            self.stdout.write(f"\n{text}\n")
+            self.stdout.write(f"\n{plain(text)}\n")
         self.stdout.flush()
 
     def status(self, mode: str) -> None:
@@ -366,7 +377,7 @@ class UI:
         if self._live():
             # Your turn: yellow, like the boxes, wrapped to the terminal.
             text = f"{_YELLOW}{self._buttons(self._wrap(text.rstrip(' ')), _YELLOW)}{_RESET} "
-        self.stdout.write(text)
+        self.stdout.write(plain(text))
         self.stdout.flush()
         line = self.stdin.readline()
         return line.rstrip("\r\n")

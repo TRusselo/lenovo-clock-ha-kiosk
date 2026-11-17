@@ -68,14 +68,14 @@ Evidence labels: **Observed** (read on a real clock or its backup), **Reported**
   but after every restart Cast is installed for user 0 again (`installed=true`, read before and after two
   restarts). **The order seems to matter:** on the first clock Cast was `disable-user`'d first (04:17), the clock
   restarted, then it was uninstalled for user 0 (05:00), and it stayed gone through every restart after
-  (`cast-gone` at 06:23, after the Magisk flashes). **Observed** on one clock each; why the order matters is a
-  **Guess** (perhaps Android Things puts back only apps that aren't disabled). The tool now does it in the first
-  clock's order. Android Things seems to reinstall the `/oem` apps
+  (`cast-gone` at 06:23, after the Magisk flashes). **But e2e run 3 (2026-11-16) did exactly that order on the
+  same clock** (disable, restart, uninstall, restart) and Cast was back after the last restart. So the order isn't
+  what kept it off on the first clock; what did is unknown. **Observed.** Android Things seems to reinstall the `/oem` apps
   for user 0 at boot (**Guess**: the log doesn't say why). `pm disable` as root doesn't stop it either
   (persistent: started at boot anyway). **What works, observed:** a Magisk `post-fs-data.d` script that
   bind-mounts an empty folder over `/oem/app/com.google.android.apps.mediashell`. After a restart Cast isn't
-  listed or running, `sparrow.oem` runs, about 257 MB RAM free. The tool uses it as a fallback, so root comes
-  before the degoogle step.
+  listed or running, `sparrow.oem` runs, about 257 MB RAM free. Again in run 3. It's the only thing seen to keep
+  Cast off on every try, so the tool uses it directly, and root comes before the degoogle step.
 - Light sensor and volume keys work under Kiosk Satellite with `sparrow.oem` running: no bootfix needed.
   Kiosk Satellite comes up rotated wrong; its forced-landscape setting fixes it. **Observed** (by the person).
 
@@ -105,3 +105,11 @@ Evidence labels: **Observed** (read on a real clock or its backup), **Reported**
 - Mute slider under Kiosk Satellite: untested.
 - Mic capture for the voice satellite: untested.
 - Whether LK falls back to slot B after three failed slot-A boots: untested.
+
+## USB modes, seen from the computer
+
+- When the clock leaves BROM or fastboot (it starts normally, or is unplugged), its device file under
+  `/dev/bus/usb` goes at once. A scan that lists it and then checks its permissions can find it gone in between,
+  which reads like a permission problem. Seen 2 of 3 times in e2e run 3. **Observed.**
+- Holding VOLUME UP passes through BROM at 3 to 5 seconds and reaches fastboot at about 8 to 10. Letting go in
+  between lets the clock start normally, and then its USB shows nothing. **Observed.**

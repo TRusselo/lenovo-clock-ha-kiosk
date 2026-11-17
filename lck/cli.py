@@ -54,12 +54,16 @@ def _context(args) -> Context:
     from lck.ui import UI
     paths = Paths(args.workdir)
     logger = log.setup(paths.logs / f"{args.name}.log")
+    logger.info("%s %s", RUN_MARK, " ".join(sys.argv[1:]) or args.command)
     ctx = Context(runner=RealRunner(logger=logger), ui=UI(), paths=paths,
                   state={"progress_id": args.name, "log": logger})
     if getattr(args, "ip", None):
         ctx.state["ip"] = args.ip
     ctx.state["tools"] = Tools.locate(paths.cache)
     return ctx
+
+
+RUN_MARK = "=== lck run:"
 
 
 def _status(args) -> int:
@@ -232,6 +236,9 @@ def _print_log_tail(args, lines: int = 12) -> None:
     except OSError:
         return
     home = str(Path.home())
+    # Only this run's lines (e2e run 3: the tail held two earlier runs' lines above this stop).
+    if RUN_MARK in text:
+        text = text[text.rindex(RUN_MARK):].split("\n", 1)[-1]
     tail = [l for l in text.splitlines() if l.strip()][-lines:]
     if not tail:
         return

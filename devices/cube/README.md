@@ -152,8 +152,7 @@ IP address. Always pass `-s <clock-ip>:5555`, so nothing else connected is touch
 
 ## 9. `root`: Magisk
 
-Root comes before switching Google off, so step 10's fallback for Cast is there if it's needed. Most people
-expect root anyway. The clock has no userdebug build, so the Smart Display's `adb root` route doesn't exist
+Root comes before switching Google off: keeping Cast off needs it (step 10). Most people expect root anyway. The clock has no userdebug build, so the Smart Display's `adb root` route doesn't exist
 here, and **`adb disable-verity` would likely stop it starting** (LK refuses a vbmeta with verity flags set).
 Magisk patches only `boot_a`; system and verity stay untouched.
 
@@ -177,28 +176,11 @@ Magisk patches only `boot_a`; system and verity stay untouched.
 
 Cast (`mediashell`) and Assistant core are **persistent** apps: `disable-user` alone doesn't stop them, Android
 starts them again at boot, and Cast grew to about 594 MB of the clock's 1 GB, starving WebView until Kiosk
-Satellite was killed. **The order matters.** On the first clock, `disable-user` first, a restart, then
-`pm uninstall -k --user 0` kept Cast off through every restart after. Uninstalling alone (e2e run 2) didn't:
-Cast was back for user 0 after each restart.
-
-```bash
-for p in com.google.android.apps.mediashell com.google.assistant.launcher com.google.assistant.core \
-         com.google.android.things.checkin com.google.android.things.customcheckin; do
-  adb shell pm disable-user --user 0 $p
-done
-adb shell pm uninstall -k --user 0 com.google.android.apps.mediashell
-adb reboot
-```
-
-If Cast is listed again after that restart (`pm list packages com.google.android.apps.mediashell`), do it the
-first clock's way, with a restart in the middle: `disable-user` Cast, `adb reboot`, then the uninstall, and
-`adb reboot` again. Whether that middle restart matters isn't known yet.
-
-Undo Cast: `adb shell cmd package install-existing com.google.android.apps.mediashell`, then
-`adb shell pm enable com.google.android.apps.mediashell`.
-
-**If Cast still comes back** (with root, step 9): a Magisk boot script that mounts an empty folder over Cast's app
-folder before Android looks there. Tested on a clock in e2e run 2: Cast neither listed nor running.
+Satellite was killed. **Uninstalling Cast for user 0 doesn't last:** it answers `Success`, but in e2e runs 2 and 3
+Cast was back for user 0 after the next restart, whether or not it was disabled first and with or without a
+restart between. What lasts, with root (step 9): a Magisk boot script that mounts an empty folder over Cast's app
+folder before Android looks there. Note the quotes: `su -c` must get the whole command as one argument, or only
+its first part runs as root.
 
 ```bash
 cat > hide-cast.sh <<'EOS'
@@ -208,11 +190,16 @@ mkdir -p /data/adb/empty-cast
 mount -o bind /data/adb/empty-cast /oem/app/com.google.android.apps.mediashell
 EOS
 adb push hide-cast.sh /data/local/tmp/
-adb shell su -c "mkdir -p /data/adb/post-fs-data.d /data/adb/empty-cast && cp /data/local/tmp/hide-cast.sh /data/adb/post-fs-data.d/ && chmod 755 /data/adb/post-fs-data.d/hide-cast.sh"
+adb shell "su -c 'mkdir -p /data/adb/post-fs-data.d /data/adb/empty-cast && cp /data/local/tmp/hide-cast.sh /data/adb/post-fs-data.d/ && chmod 755 /data/adb/post-fs-data.d/hide-cast.sh && rm /data/local/tmp/hide-cast.sh'"
+for p in com.google.assistant.launcher com.google.assistant.core com.google.android.things.checkin \
+         com.google.android.things.customcheckin com.google.android.apps.mediashell; do
+  adb shell pm disable-user --user 0 $p
+done
 adb reboot
 ```
 
-Undo the boot script: delete `/data/adb/post-fs-data.d/hide-cast.sh` and `/data/adb/empty-cast`, then restart.
+Undo Cast: delete `/data/adb/post-fs-data.d/hide-cast.sh` and `/data/adb/empty-cast`, restart, then
+`adb shell pm enable com.google.android.apps.mediashell`.
 
 Until Kiosk Satellite is installed (step 12), the screen stays blank or shows four dots: Assistant's home screen
 is off. Swiping up still opens the settings.

@@ -107,6 +107,8 @@ class VerifyStep(Step):
         z = ctx.paths.backup / f"{ctx.state.get('progress_id', 'clock')}.zip"
         ip = ctx.state.get("ip")
         nxt = [f"Change Kiosk Satellite's settings from a browser: http://{ip}:2324",
+               "If Home Assistant doesn't show the clock, add it: Settings, Devices & services, Kiosk Satellite "
+               "(ESPHome). If an old copy of the clock stays unavailable there, remove it.",
                "A dashboard made for the clock's small screen: " + doc("dashboard/README.md"),
                "If a dashboard shows times an hour off: " + doc("docs/TIMEZONES.md"),
                "Questions: see " + doc("README.md", "Questions, problems, or it worked?")]

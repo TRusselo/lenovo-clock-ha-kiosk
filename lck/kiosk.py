@@ -49,8 +49,9 @@ def _rate_limited(r) -> None:
             when = " after " + datetime.datetime.fromtimestamp(int(headers["X-RateLimit-Reset"])).strftime("%H:%M")
         raise KioskError("GitHub is limiting lookups from your internet connection right now. It allows "
                          "60 an hour, shared by every device on your network. Run the same command "
-                         f"again{when}, or set GITHUB_TOKEN to a GitHub token first: "
-                         + doc("docs/LINUX.md", "If GitHub limits lookups") + ".")
+                         f"again{when}. Or reach GitHub from another address: turn a VPN on or off, or "
+                         "change its location (a shared VPN address often has the 60 used up already). Or set "
+                         "GITHUB_TOKEN to a GitHub token: " + doc("docs/LINUX.md", "If GitHub limits lookups") + ".")
 
 
 def _headers() -> dict:

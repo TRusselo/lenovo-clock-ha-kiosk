@@ -58,8 +58,9 @@ def script(ctx) -> Path:
 
 
 def prepare(ctx) -> None:
-    """Fetch mtkclient's packages now, so nothing downloads while the clock waits in BROM."""
-    with ctx.ui.busy("Setting up mtkclient"):
+    """Fetch mtkclient and its packages now, so nothing downloads while the clock waits in BROM."""
+    script(ctx)
+    with ctx.ui.busy("Setting up mtkclient's packages"):
         ctx.runner.run([*_python(ctx), "-c", "import usb, Cryptodome, Crypto, unicorn, capstone"],
                        timeout=1800)
 

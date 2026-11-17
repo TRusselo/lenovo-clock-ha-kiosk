@@ -8,6 +8,7 @@ Lenovo Smart Clock gen 1 (ro.product.device mt8167s_som).
 from __future__ import annotations
 
 import ipaddress
+import shlex
 import re
 import time
 
@@ -73,6 +74,12 @@ def shell(ctx, *args, check=True, timeout=120) -> str:
     return adb(ctx, "shell", *args, check=check, timeout=timeout).out
 
 
+def su(ctx, command: str, check=True, timeout=120) -> str:
+    """Run `command` as root. adb shell joins its arguments for the clock's sh, so the command must
+    reach `su -c` as one quoted argument: unquoted, only its first part runs as root (e2e run 3)."""
+    return shell(ctx, "su", "-c", shlex.quote(command), check=check, timeout=timeout)
+
+
 def prop(ctx, name: str) -> str:
     return shell(ctx, "getprop", name, check=False, timeout=20).strip()
 
@@ -113,16 +120,21 @@ def booted(ctx) -> bool:
 
 
 def wait_booted(ctx, timeout=600, why="the clock to start", sleep=time.sleep, ask_after=240) -> None:
-    """Wait until Android has finished starting and adb over Wi-Fi answers. Silent when it has.
-    The clock's address can change at any restart: after `ask_after` seconds with no answer,
-    the person is asked whether it has, and the wait goes on at the new one."""
+    """Wait until Android has finished starting and adb over Wi-Fi answers. Silent when it has."""
     if booted(ctx):
         return
+    _wait(ctx, lambda: booted(ctx), timeout, why, sleep, ask_after)
+
+
+def _wait(ctx, ready, timeout, why, sleep, ask_after) -> None:
+    """One spinner from the start of the wait to its end, with the real time. The clock's address
+    can change at any restart: after `ask_after` seconds with no answer, the person is asked
+    whether it has, and the wait goes on at the new one."""
     start = time.monotonic()
     asked = False
     while True:
         with ctx.ui.busy(f"Waiting for {why}"):
-            while not booted(ctx):
+            while not ready():
                 waited = time.monotonic() - start
                 if waited > timeout:
                     raise SetupFailed(f"The clock didn't come back on Wi-Fi at {ctx.state.get('ip')} within "
@@ -148,14 +160,11 @@ def boot_id(ctx) -> str:
         return ""
 
 
-def wait_restarted(ctx, old_id: str, timeout=600, why="the clock to restart", sleep=time.sleep) -> None:
-    """Wait for a restart that someone else started (Magisk's extra setup), then for Android."""
-    end = time.monotonic() + timeout
-    with ctx.ui.busy(f"Waiting for {why}"):
-        while not (booted(ctx) and boot_id(ctx) not in ("", old_id)):
-            if time.monotonic() > end:
-                raise SetupFailed(f"The clock didn't restart within {timeout // 60} minutes.")
-            sleep(3)
+def wait_restarted(ctx, old_id: str, timeout=600, why="the clock to restart", sleep=time.sleep,
+                   ask_after=240) -> None:
+    """Wait for a restart (the tool's own, or Magisk's), then for Android: done when the clock
+    answers with a new boot id."""
+    _wait(ctx, lambda: booted(ctx) and boot_id(ctx) not in ("", old_id), timeout, why, sleep, ask_after)
 
 
 def find_on_wifi(ctx) -> str | None:
@@ -175,10 +184,12 @@ def find_on_wifi(ctx) -> str | None:
 
 
 def reboot(ctx, why="the clock to restart") -> None:
+    """Restart the clock and wait for it, the spinner running from the moment it's asked to
+    (e2e run 3: the line appeared ~40 s late, with a wrong time)."""
+    old = boot_id(ctx)
     adb(ctx, "reboot", check=False, timeout=30)
-    time.sleep(10)
     _run(ctx, "disconnect", address(ctx), check=False, timeout=15)
-    wait_booted(ctx, why=why)
+    wait_restarted(ctx, old, why=why)
 
 
 def wifi_ip(ctx) -> str:
