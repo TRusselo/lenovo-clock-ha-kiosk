@@ -160,11 +160,10 @@ class RootStep(Step):
         old = clock.boot_id(ctx)
         open_magisk(ctx)
         ctx.ui.physical("Magisk is open on the clock (it may open sideways: that's fine). If it says Requires "
-                        "Additional Setup, tap OK: the clock "
-                        "restarts on its own, and the tool waits for it. If it doesn't ask (its setup was done "
-                        "on an earlier try), there's nothing to tap. Close any popup offering to patch: that's "
-                        "done already.")
-        if not clock.wait_restarted(ctx, old, why="the clock to restart, after you tap OK", give_up=90):
+                        "Additional Setup, **tap OK**. Touch nothing else: the clock restarts by itself, and the tool "
+                        "waits for it. If it doesn't ask (its setup was done on an earlier try), there's nothing to "
+                        "tap. Close any popup offering to patch: that's done already.")
+        if not clock.wait_restarted(ctx, old, why="the clock to restart, after you tap OK", give_up=180):
             if choose(ctx.ui, "No restart yet. If Magisk didn't ask for extra setup, press Enter to carry on; if "
                               "you tapped OK, wait for it to restart first. Or type stop: ", "stop"):
                 raise RootFailed("Stopped before Magisk was set up. Run the same command again to carry on.")
@@ -172,7 +171,8 @@ class RootStep(Step):
         settle(ctx)
         shell(ctx, "su", "-c", "id", check=False, timeout=30)   # asks Magisk, which logs the request
         open_magisk(ctx)
-        ctx.ui.physical("Now let adb use root. In Magisk, open the Superuser tab (the shield at the bottom):\n"
+        ctx.ui.physical("Now let adb use root. In Magisk (it may be sideways: that's fine), open the Superuser tab "
+                        "(the shield at the bottom):\n"
                         "  1. Tap + (add)\n"
                         "  2. Tick Shell in the list\n"
                         "  3. Tap the back arrow, top left. Shell is now listed, with its switch on\n"

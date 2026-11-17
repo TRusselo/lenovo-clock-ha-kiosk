@@ -170,6 +170,8 @@ class UnlockStep(Step):
         return clock.converted(ctx)
 
     def run(self, ctx) -> None:
+        from lck.images import ensure_wifi
+        ensure_wifi(ctx)              # before the unlock, the first write
         ctx.ui.say("The bootloader's lock can only be read in fastboot mode. If the clock is unlocked already, "
                    "this only reads it.")
         wait_for_mode(Mode.FASTBOOT, ctx, prompt=FASTBOOT_PROMPT)

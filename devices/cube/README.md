@@ -97,6 +97,15 @@ img2simg oem_b.bin oem.simg       && python sparsesplit.py oem.simg oem_chunk 94
 
 ## 5. `userdata`: switch on adb over Wi-Fi, offline
 
+**First, before unlocking (step 3), check the backup has a saved Wi-Fi network:** once Android runs, the clock's USB
+is host-only, so after the flash the only way in is Wi-Fi, and the only network it knows is the one in its user
+data. `debugfs -R "cat /misc/wifi/WifiConfigStore.xml" userdata_copy.img | grep -c '<Network>'` (after
+`e2fsck -fy` on a copy) must be 1 or more. If it's 0, either set the clock up with the Google Home app and back it
+up again, or add a WPA2 network to the copy: `lck.userdata.add_wifi(img, name, password)` writes one entry in the
+shape Android Things 8.1 uses (owner 1000:1000, mode 0600, label `wifi_data_file`). **Untested on a clock:** the
+tool's own way of adding it, found needed in e2e run 5.
+
+
 ```bash
 cp --sparse=always userdata.bin userdata_things.img
 e2fsck -fy userdata_things.img                     # replays the journal; exit code 1 is fine

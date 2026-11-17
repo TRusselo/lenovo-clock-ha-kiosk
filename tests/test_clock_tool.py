@@ -684,3 +684,64 @@ def test_a_folder_isnt_dropped_when_the_zip_differs(tmp_path):
     backup.pack(c, folder)
     (folder / backup.SUMS).write_text((folder / backup.SUMS).read_text() + "0" * 64 + "  other\n")
     assert backup.drop_folder(c, folder) is False and folder.exists()
+
+
+def _tty_ui(monkeypatch):
+    import io
+    import lck.ui as ui_mod
+    from lck.ui import UI
+
+    class Tty(io.StringIO):
+        def isatty(self):
+            return True
+    monkeypatch.setattr(ui_mod, "_windows_vt_on", lambda: True)
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    out = Tty()
+    return UI(stdout=out), out
+
+
+def test_one_box_on_screen_at_a_time_and_the_reason_carries_over(monkeypatch):
+    # e2e run 5: the start-normally box and the Magisk box were on screen together.
+    ui, out = _tty_ui(monkeypatch)
+    ui.screen(["Root"], 1, set())
+    ui.physical("First box")
+    ui.say("Why the next box")
+    ui.physical("Second box")
+    last_screen = out.getvalue().rsplit("\x1b[H\x1b[2J", 1)[-1]
+    assert "Second box" in last_screen and "First box" not in last_screen and "Why the next box" in last_screen
+
+
+def test_links_stand_out_on_their_own_line(monkeypatch):
+    from lck import doc
+    ui, out = _tty_ui(monkeypatch)
+    ui.section("What's next", ["A dashboard: " + doc("dashboard/README.md")])
+    text = out.getvalue()
+    assert "\n" in text.split("dashboard/README.md", 1)[1].split("https://", 1)[0]
+    assert "\x1b[4;38;5;80mhttps://" in text
+
+
+def test_wifi_entry_is_well_formed_and_escaped():
+    import xml.dom.minidom
+    from lck import userdata
+    from xml.sax.saxutils import escape
+    ents = {'"': "&quot;", "'": "&apos;"}
+    entry = userdata.NETWORK.format(key=escape('"A & B"WPA_PSK', ents), ssid=escape('"A & B"', ents),
+                                    psk=escape('"p<ss>w\'rd"', ents))
+    xml.dom.minidom.parseString(userdata.EMPTY_STORE.replace("</NetworkList>", entry + "</NetworkList>").encode())
+    with pytest.raises(userdata.UserdataFailed):
+        userdata.check_wifi("Home", "short")
+
+
+def test_no_saved_wifi_asks_before_anything_is_written(tmp_path, monkeypatch):
+    from lck import images, userdata
+    folder = _zstd_backup(tmp_path)
+    monkeypatch.setattr(images, "backup_dir", lambda ctx: folder)
+    monkeypatch.setattr(userdata, "wifi_networks", lambda img: 0)
+    ui = FakeUI(["1", "Home", "secret-pass"])
+    c = ctx_for(tmp_path, ui=ui, runner=FakeRunner())
+    images.ensure_wifi(c)
+    assert c.state["wifi_new"] == ("Home", "secret-pass")
+    assert not any("secret-pass" in l for l in ui.lines)        # the password is never echoed back
+    ui2 = FakeUI(["2"])
+    with pytest.raises(images.ImagesFailed, match="Google Home"):
+        images.ensure_wifi(ctx_for(tmp_path, ui=ui2, runner=FakeRunner()))

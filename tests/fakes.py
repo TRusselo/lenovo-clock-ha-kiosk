@@ -99,6 +99,10 @@ class FakeUI:
             self.lines.append(f"[done] {job.final}")
 
 
+    def ask_secret(self, text):
+        self.lines.append(f"[ask secret] {text}")
+        return self.answers.pop(0) if self.answers else ""
+
     def ask(self, text):
         self.lines.append(f"[ask] {text}")
         return self.answers.pop(0) if self.answers else ""

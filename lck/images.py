@@ -129,6 +129,42 @@ class ImagesStep(Step):
         (out / ".done").write_text("")
 
 
+def ensure_wifi(ctx) -> None:
+    """Before anything is written: the clock has to come up on Wi-Fi after the flash, since once
+    Android runs its USB is host-only, and the only network it knows is the one saved in the backup's
+    user data. With none (a clock never set up), ask for one, or for the Google Home route (e2e
+    run 5). The answer stays in memory: a later run asks again."""
+    if ctx.state.get("wifi_checked"):
+        return
+    folder = backup_dir(ctx)
+    if backup.verify_backup(folder):
+        return                        # no backup: the steps that need one say so
+    probe = work(ctx) / "wifi_check.img"
+    probe.parent.mkdir(parents=True, exist_ok=True)
+    with ctx.ui.busy("Checking the backup for a saved Wi-Fi network"):
+        part = backup.extract(ctx, folder, ["userdata"], work(ctx) / "parts")["userdata"]
+        if is_empty(part):
+            return                    # wiped by an unlock: the images step explains that
+        ctx.runner.run(["cp", "--sparse=always", part, probe], timeout=1800)
+        ctx.runner.run(["e2fsck", "-fy", probe], check=False, timeout=1800)
+        count = userdata.wifi_networks(str(probe))
+        probe.unlink(missing_ok=True)
+    if count:
+        ctx.state["wifi_checked"] = True
+        return
+    from lck.system import ask_wifi
+    ssid_psk = ask_wifi(ctx)
+    if ssid_psk is None:
+        raise ImagesFailed(GOOGLE_HOME_WAY.format(folder=folder))
+    ctx.state["wifi_new"] = ssid_psk
+    ctx.state["wifi_checked"] = True
+
+
+GOOGLE_HOME_WAY = ("Nothing was changed. Set the clock up on your Wi-Fi with the Google Home app. Then put the old "
+                   "backup aside, so setup makes a new one with the Wi-Fi in it: rename {folder} (and its .zip, "
+                   "if there is one) to another name, and run the same command again.")
+
+
 class UserdataStep(Step):
     name = "userdata"
     title = "Switch on adb over Wi-Fi in the clock's user data"
@@ -137,6 +173,7 @@ class UserdataStep(Step):
         return clock.converted(ctx) or (work(ctx) / "images" / "userdata_chunk.0").exists()
 
     def run(self, ctx) -> None:
+        ensure_wifi(ctx)
         parts = _parts(ctx)
         out = work(ctx) / "images"
         length = parts["userdata"].stat().st_size
@@ -153,6 +190,10 @@ class UserdataStep(Step):
             if r.code not in (0, 1):
                 raise ImagesFailed("The backup's user data has file system errors e2fsck can't fix.")
             userdata.inject(str(img), str(key), runner=ctx.runner)
+            if ctx.state.get("wifi_new"):
+                ssid, psk = ctx.state["wifi_new"]
+                userdata.add_wifi(str(img), ssid, psk)
+                ctx.ui.say(f"Added the Wi-Fi network {ssid} to the clock's user data.")
             with open(img, "r+b") as f:
                 f.truncate(sparse.whole_blocks(length))
             r = ctx.runner.run(["e2fsck", "-fn", img], check=False, timeout=1800)

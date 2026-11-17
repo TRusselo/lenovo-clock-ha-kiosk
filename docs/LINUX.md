@@ -10,8 +10,10 @@ in a few lines.
 - A **Lenovo Smart Clock, gen 1**: the label underneath says **CD-24501F**. Other models aren't supported.
 - Its **round barrel-plug power supply**. The clock runs on that, not on USB.
 - A **USB A-to-A cable**, straight-through (no chip in the middle). It goes into the USB port on the clock's back.
-- The clock already **set up on your Wi-Fi**. After the conversion it reconnects to the same network, and the
+- The clock **set up on your Wi-Fi**, ideally. After the conversion it reconnects to the same network, and the
   tool reaches it there.
+  If it never was, the tool says so before changing anything, and asks for your Wi-Fi name and password (or
+  stops, so you can set it up with the Google Home app first).
 - About **20 GB free**.
 
 ## 2. Install the packages (once)

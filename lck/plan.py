@@ -115,7 +115,10 @@ class VerifyStep(Step):
         if problems:
             raise SetupFailed("Final check failed: " + "; ".join(problems) + ".")
         z = ctx.paths.backup / f"{ctx.state.get('progress_id', 'clock')}.zip"
-        backup.drop_folder(ctx, z.with_suffix(""))
+        folder = z.with_suffix("")
+        if folder.is_dir() and not z.exists() and not backup.verify_backup(folder):
+            backup.pack(ctx, folder)      # a backup made before zips, or seeded: zip it first (e2e run 5)
+        backup.drop_folder(ctx, folder)
         ip = ctx.state.get("ip")
         nxt = [f"Change Kiosk Satellite's settings from a browser: http://{ip}:2324",
                "If Home Assistant doesn't show the clock, add it: Settings, Devices & services, Kiosk Satellite "

@@ -4,6 +4,21 @@ What changed for people converting a clock. Newest first.
 
 ## Unreleased
 
+### Fixes from the fifth end-to-end run
+- **Wi-Fi is checked before anything is written.** After the flash the clock can only be reached over Wi-Fi,
+  and the only network it knows is the one saved in its backup. A clock never set up on Wi-Fi has none. The tool
+  now checks the backup first and, if there's none, asks for your Wi-Fi name and password (not shown as you type,
+  never logged) and adds them to the user data; or it stops so you can set the clock up with the Google Home app.
+  Adding the network is untested on a clock so far.
+- **One "On the clock" box at a time:** a new box in the same step redraws the screen, and carries over what was
+  said just before it.
+- **Magisk:** **tap OK** in bold, "Touch nothing else", 3 minutes for its restart; the sideways note in the Shell
+  box too.
+- **Addresses and links stand out** (cyan, underlined), and doc links go on a line of their own.
+- **A backup folder with no zip gets one** at the end, so "keep only the zip" works for older backups too.
+- The address box reads as one instruction: "Then swipe up from the bottom, tap the gear (Settings), then About
+  device: the address is under IP address."
+
 ### Fixes from the fourth end-to-end run
 - **Switching Google off sticks:** Android saves `pm disable-user` 5 to 10 seconds later, and a restart sooner lost
   all four. The step now waits until the changes are saved, then restarts. The blank-screen note comes before the

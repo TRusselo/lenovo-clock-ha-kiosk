@@ -89,6 +89,107 @@ def inject(img: str, pub: str, runner=None) -> None:
               "persist.sys.disable_rescue=true, adb_keys")
 
 
+WIFI_STORE = "/misc/wifi/WifiConfigStore.xml"
+WIFI_CTX = "u:object_r:wifi_data_file:s0"
+EMPTY_STORE = """<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<WifiConfigStoreData>
+<int name="Version" value="1" />
+<NetworkList>
+</NetworkList>
+<PasspointConfigData>
+<long name="ProviderIndex" value="0" />
+</PasspointConfigData>
+</WifiConfigStoreData>
+"""
+# One WPA2-PSK network, in the shape Android Things 8.1 wrote for the network the first clock was
+# set up on (its WifiConfigStore.xml, read from the backup; only the values differ). Untested as
+# written by the tool: e2e run 5 found the need, the next run tests it.
+NETWORK = """<Network>
+<WifiConfiguration>
+<string name="ConfigKey">{key}</string>
+<string name="SSID">{ssid}</string>
+<null name="BSSID" />
+<string name="PreSharedKey">{psk}</string>
+<null name="WEPKeys" />
+<int name="WEPTxKeyIndex" value="0" />
+<boolean name="HiddenSSID" value="true" />
+<boolean name="RequirePMF" value="false" />
+<byte-array name="AllowedKeyMgmt" num="1">02</byte-array>
+<byte-array name="AllowedProtocols" num="1">02</byte-array>
+<byte-array name="AllowedAuthAlgos" num="1">01</byte-array>
+<byte-array name="AllowedGroupCiphers" num="1">0f</byte-array>
+<byte-array name="AllowedPairwiseCiphers" num="1">04</byte-array>
+<boolean name="Shared" value="true" />
+<int name="Status" value="2" />
+<null name="FQDN" />
+<null name="ProviderFriendlyName" />
+<null name="LinkedNetworksList" />
+<null name="DefaultGwMacAddress" />
+<boolean name="ValidatedInternetAccess" value="false" />
+<boolean name="NoInternetAccessExpected" value="false" />
+<int name="UserApproved" value="0" />
+<boolean name="MeteredHint" value="false" />
+<int name="MeteredOverride" value="0" />
+<boolean name="UseExternalScores" value="false" />
+<int name="NumAssociation" value="0" />
+<int name="CreatorUid" value="1000" />
+<string name="CreatorName">android.uid.system:1000</string>
+<string name="CreationTime">time=01-01 00:00:00.000</string>
+<int name="LastUpdateUid" value="1000" />
+<string name="LastUpdateName">android.uid.system:1000</string>
+<int name="LastConnectUid" value="0" />
+<boolean name="IsLegacyPasspointConfig" value="false" />
+<long-array name="RoamingConsortiumOIs" num="0" />
+</WifiConfiguration>
+<NetworkStatus>
+<string name="SelectionStatus">NETWORK_SELECTION_ENABLED</string>
+<string name="DisableReason">NETWORK_SELECTION_ENABLE</string>
+<null name="ConnectChoice" />
+<long name="ConnectChoiceTimeStamp" value="-1" />
+<boolean name="HasEverConnected" value="false" />
+</NetworkStatus>
+<IpConfiguration>
+<string name="IpAssignment">DHCP</string>
+<string name="ProxySettings">NONE</string>
+</IpConfiguration>
+</Network>
+"""
+
+
+def wifi_networks(img: str) -> int:
+    """How many Wi-Fi networks the user data has saved. Needs e2fsck -fy first. The file's
+    contents (with the password) are never logged or printed."""
+    return cat(img, WIFI_STORE).decode("utf-8", "replace").count("<Network>")
+
+
+def check_wifi(ssid: str, psk: str) -> None:
+    if not 1 <= len(ssid.encode()) <= 32:
+        raise UserdataFailed("A Wi-Fi name is 1 to 32 characters.")
+    if not 8 <= len(psk) <= 63:
+        raise UserdataFailed("A WPA2 Wi-Fi password is 8 to 63 characters. Networks with no password, or WEP, "
+                             "aren't supported by the tool: set the clock up with the Google Home app instead.")
+
+
+def add_wifi(img: str, ssid: str, psk: str) -> None:
+    """Add one WPA2-PSK network to the copy of the user data, owners and SELinux label as stock."""
+    from xml.sax.saxutils import escape
+    check_wifi(ssid, psk)
+    ents = {'"': "&quot;", "'": "&apos;"}
+    entry = NETWORK.format(key=escape(f'"{ssid}"WPA_PSK', ents), ssid=escape(f'"{ssid}"', ents),
+                           psk=escape(f'"{psk}"', ents))
+    exists = subprocess.run(["debugfs", "-R", "stat /misc/wifi", img], capture_output=True,
+                            text=True).stdout.startswith("Inode:")
+    if not exists:
+        raise UserdataFailed("This user data has no /misc/wifi folder, so the tool can't add a network to it. "
+                             "Set the clock up on your Wi-Fi with the Google Home app instead.")
+    xml = cat(img, WIFI_STORE).decode("utf-8", "replace") or EMPTY_STORE
+    if "</NetworkList>" not in xml:
+        xml = EMPTY_STORE
+    xml = xml.replace("</NetworkList>", entry + "</NetworkList>", 1)
+    with tempfile.TemporaryDirectory() as tmp:
+        put(img, tmp, WIFI_STORE, xml.encode(), 1000, 1000, 0o600, WIFI_CTX)
+
+
 def main() -> None:
     inject(sys.argv[1], sys.argv[2])
 

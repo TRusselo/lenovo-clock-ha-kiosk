@@ -39,6 +39,7 @@ _PLAIN = {"ok": "[x]", "todo": "[ ]", "fail": "[!]", "full": "#", "empty": "-", 
 _BOLD, _PURPLE, _TITLE, _YELLOW, _RED, _CYAN, _NOW, _DIM, _RESET = (
     "\x1b[1m", "\x1b[38;5;141m", "\x1b[1;38;5;141m", "\x1b[1;33m", "\x1b[31m", "\x1b[38;5;80m",
     "\x1b[1;38;5;80m", "\x1b[38;5;248m", "\x1b[0m")    # "dim" is a light grey: the terminal's own dim is unreadable on black
+_LINK = "\x1b[4;38;5;80m"
 CLEAR = "\x1b[H\x1b[2J\x1b[3J"     # the screen and the scrollback: no banner or old screens above
 TITLE = "Lenovo Smart Clock {to} Home Assistant"
 DEVICE = "Lenovo Smart Clock"
@@ -51,6 +52,13 @@ _BUTTONS = re.compile(r"\b(VOLUME\s+UP|VOLUME\s+DOWN|FINISH|Finish|Enter|[Uu]npl
                       r"[Hh]old(?:ing)?\s+no\s+buttons|(?:with\s+)?no\s+buttons\s+held|"
                       r"[Ll]et\s+go(?:\s+of\s+the\s+buttons|\s+of\s+VOLUME\s+UP)?)\b")
 _MARKED = re.compile(r"\*\*(.+?)\*\*", re.S)
+_URL = re.compile(r"https?://[^\s)]+")
+# doc()'s "(in the tool's folder, or <url>)": the link goes on a line of its own (e2e run 5: it wrapped badly).
+_DOC_LINK = re.compile(r" \(in the tool's folder, or (https?://[^\s)]+)\)")
+
+
+def _own_line(text: str) -> str:
+    return _DOC_LINK.sub(lambda m: " (in the tool's folder, or online:)\n  " + m.group(1), text)
 
 
 def plain(text: str) -> str:
@@ -79,6 +87,8 @@ class UI:
         self._intro = []      # stays on each screen until the user is first needed
         self._kept = []       # shown once more, on the next screen
         self._last = None     # the last screen drawn, for redraw()
+        self._box_shown = False   # an "On the clock" box is on the current screen
+        self._since_box = []      # what was said under it, carried over when the next box redraws
 
     def _symbols(self) -> dict:
         if self._sym is None and _old_windows_console():
@@ -123,6 +133,8 @@ class UI:
         if not self._colour():
             return plain(text)
         text = _MARKED.sub(lambda m: f"{_BOLD}{m.group(1)}{_RESET}{colour}", text)
+        # Addresses and links stand out (e2e run 5), in the screen's cyan, underlined.
+        text = _URL.sub(lambda m: f"{_LINK}{m.group(0)}{_RESET}{colour}", text)
         return _BUTTONS.sub(lambda m: f"{_BOLD}{m.group(0)}{_RESET}{colour}", text)
 
     def redraw(self) -> None:
@@ -145,17 +157,29 @@ class UI:
 
     def say(self, text: str) -> None:
         self._end_status()
-        text = self._buttons(self._wrap(text)) if self._live() else plain(text)
+        if self._box_shown:
+            self._since_box.append(text)
+        text = self._buttons(self._wrap(_own_line(text))) if self._live() else plain(text)
         self.stdout.write(f"{text}\n")
         self.stdout.flush()
 
     def physical(self, text: str) -> None:
-        """Something to do with your hands, at the clock."""
+        """Something to do with your hands, at the clock. One box on screen at a time: a second
+        box in the same step redraws the screen first (e2e run 5: two boxes, easy to read the
+        wrong one)."""
         self._end_status()
         self._users_turn()
+        if self._live() and self._box_shown:
+            # What was said since the last box (why this one comes) is said again under the fresh screen.
+            pending, self._since_box = self._since_box, []
+            self.redraw()
+            for line in pending:
+                self.say(line)
+        self._box_shown = True
+        self._since_box = []
         if self._colour():
             head = self._paint(_YELLOW, f"{self._symbols()['arrow']} On the clock")
-            self.stdout.write(f"\n  {head}\n{self._buttons(self._wrap(text, '    '))}\n")
+            self.stdout.write(f"\n  {head}\n{self._buttons(self._wrap(_own_line(text), '    '))}\n")
         else:
             bar = "=" * 72
             self.stdout.write(f"\n{bar}\n  DO THIS ON THE CLOCK:\n  {plain(text)}\n{bar}\n")
@@ -169,6 +193,7 @@ class UI:
             self.stdout.flush()
             return
         self._last = (self.title, (text,))
+        self._box_shown, self._since_box = False, []
         self.stdout.write(f"{CLEAR}\n  {self._paint(_TITLE, DEVICE)}\n  {self._paint(_NOW, text)}\n\n")
         self.stdout.flush()
 
@@ -202,6 +227,7 @@ class UI:
                 self.stdout.flush()
             return
         self._last = (self.screen, (titles, current, done, skipped))
+        self._box_shown, self._since_box = False, []
         sym = self._symbols()
         width = 32
         count = len(done)
@@ -220,7 +246,7 @@ class UI:
                 out.append("  " + self._paint(_DIM, f"{sym['todo']} {t}") + "\n")
         out.append("\n")
         for text in self._intro + self._kept:
-            out.append(self._buttons(self._wrap(text)) + "\n\n")
+            out.append(self._buttons(self._wrap(_own_line(text))) + "\n\n")
         self._kept = []
         self.stdout.write("".join(out))
         self.stdout.flush()
@@ -257,7 +283,7 @@ class UI:
         if self._live():
             self.stdout.write(f"\n  {self._paint(_TITLE, title)}\n")
             for line in lines:
-                self.stdout.write(self._buttons(self._wrap(line, "    ")).replace(
+                self.stdout.write(self._buttons(self._wrap(_own_line(line), "    ")).replace(
                     "    ", f"  {self._paint(_PURPLE, self._symbols()['todo'])} ", 1) + "\n")
             self.stdout.flush()
             return
@@ -372,6 +398,18 @@ class UI:
             t.join()
             self.stdout.write(" done\n" if ok else " stopped\n")
             self.stdout.flush()
+
+    def ask_secret(self, text: str) -> str:
+        """A question whose answer isn't shown as it's typed, and never logged (a Wi-Fi password)."""
+        self._end_status()
+        self._users_turn()
+        shown = f"{_YELLOW}{self._buttons(self._wrap(text.rstrip(' ')), _YELLOW)}{_RESET} " if self._live() else plain(text)
+        if getattr(self.stdin, "isatty", lambda: False)():
+            import getpass
+            return getpass.getpass(shown)
+        self.stdout.write(shown)
+        self.stdout.flush()
+        return self.stdin.readline().rstrip("\r\n")
 
     def ask(self, text: str) -> str:
         self._end_status()

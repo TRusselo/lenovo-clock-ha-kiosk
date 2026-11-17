@@ -32,8 +32,11 @@ IME = "rkr.simplekeyboard.inputmethod/.latin.LatinIME"
 IME_PKG = "rkr.simplekeyboard.inputmethod"
 WHY_WIFI = ("From here on the tool talks to the clock over Wi-Fi: once Android runs, the clock's USB port "
             "only works as a host, so the computer can't reach it over the cable.")
-WHERE_IP = ("To find the clock's address, on the clock: swipe up from the bottom, tap the gear (Settings), then "
-            "About device. It's under IP address. Your router's list of devices shows it too.")
+WHERE_IP = ("On the clock, swipe up from the bottom, tap the gear (Settings), then About device: the address is "
+            "under IP address. Your router's list of devices shows it too.")
+WHERE_IP_FIRST_START = ("Wait until the clock shows its clock face: the first start takes a few minutes. Then swipe "
+                        "up from the bottom, tap the gear (Settings), then About device: the address is under IP "
+                        "address. Your router's list of devices shows it too.")
 ASK_IP = "Type the clock's address, such as 10.0.0.23, and press Enter: "
 
 
@@ -46,14 +49,43 @@ def channel(ctx) -> str:
 def ask_ip(ctx, starting: bool = False) -> None:
     ctx.ui.say(WHY_WIFI)
     # Right after a flash the clock is still dark: "swipe up" means nothing yet (e2e run 4).
-    ctx.ui.physical(("Wait until the clock shows its clock face: the first start takes a few minutes. Then: "
-                     if starting else "") + WHERE_IP)
+    ctx.ui.physical(WHERE_IP_FIRST_START if starting else WHERE_IP)
     while True:
         answer = ctx.ui.ask(ASK_IP).strip()
         if clock.valid_ip(answer):
             ctx.state["ip"] = answer
             return
         ctx.ui.say(f'"{answer}" isn\'t an address. It looks like four numbers with dots between them.')
+
+
+NO_WIFI = ("The backup has no saved Wi-Fi network: this clock was never set up on Wi-Fi. After the flash the tool "
+           "can only reach the clock over Wi-Fi (once Android runs, its USB port can't be used), so it needs one. "
+           "Two ways:\n"
+           "  1. Type your Wi-Fi name and password here. The tool adds them to the clock's user data before "
+           "flashing. They're kept only in the work folder's images, like a backup's own Wi-Fi password, and "
+           "never logged.\n"
+           "  2. Or set the clock up with the Google Home app first, then run setup again with a new backup.")
+
+
+def ask_wifi(ctx):
+    """(name, password), or None for the Google Home way."""
+    from lck.userdata import UserdataFailed, check_wifi
+    ctx.ui.say(NO_WIFI)
+    while True:
+        answer = ctx.ui.ask("Type 1 to enter your Wi-Fi here, or 2 to use the Google Home app: ").strip()
+        if answer == "2":
+            return None
+        if answer == "1":
+            break
+        ctx.ui.say(f'"{answer}" isn\'t an answer here. Type 1 or 2.')
+    while True:
+        ssid = ctx.ui.ask("Wi-Fi name (as your phone shows it, 2.4 GHz if your router has two): ").strip()
+        psk = ctx.ui.ask_secret("Wi-Fi password (not shown as you type): ")
+        try:
+            check_wifi(ssid, psk)
+            return ssid, psk
+        except UserdataFailed as e:
+            ctx.ui.say(str(e))
 
 
 def ask_if_ip_changed(ctx) -> None:
