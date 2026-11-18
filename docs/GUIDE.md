@@ -60,7 +60,8 @@ The clock runs on its barrel plug; the USB cable alone doesn't start it.
 
 - Kiosk Satellite's settings: on the clock, or in a browser at `http://<the clock's address>:2324`. The tool
   shows the address at the end.
-- [Kiosk Clock dashboard](../dashboard/README.md): a Home Assistant dashboard made for the clock's small screen.
+- [Lenovo Clock Dashboard](https://github.com/TRusselo/lenovo-clock-dashboard): a Home Assistant dashboard made for the clock's small screen. Install it with
+  HACS; its own page has the steps, and is where to ask about it.
   Import it into Home Assistant, then pick it in Kiosk Satellite.
 - [Time zones](TIMEZONES.md): why the clock uses a fixed-offset zone.
 - Another backup, at any time: `lck backup --name <a new name>`.

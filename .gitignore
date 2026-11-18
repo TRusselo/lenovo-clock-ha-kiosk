@@ -18,5 +18,5 @@ __pycache__/
 .superpowers/
 .private-words
 
-# dashboard reference copied from a live install: holds real entity ids and room names
-dashboard/reference/
+# dashboard notes from the old in-repo copy (the dashboard lives in lenovo-clock-dashboard now)
+dashboard/

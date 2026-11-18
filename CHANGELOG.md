@@ -4,6 +4,8 @@ What changed for people converting a clock. Newest first.
 
 ## Unreleased
 
+- **The dashboard has its own home:** [lenovo-clock-dashboard](https://github.com/TRusselo/lenovo-clock-dashboard), installed with HACS. Its copy in this repo
+  is gone, so there's one place to get it and ask about it.
 ### Fixes from the fifth end-to-end run
 - **Wi-Fi is a full stop in step 1.** After the flash the clock can only be reached over Wi-Fi, on the network
   it's connected to when backed up: a network it once saved isn't enough. Step 1 asks: "Is the clock booted and

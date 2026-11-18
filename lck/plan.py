@@ -127,7 +127,7 @@ class VerifyStep(Step):
         nxt = [f"Change Kiosk Satellite's settings from a browser: http://{ip}:2324",
                "If Home Assistant doesn't show the clock, add it: Settings, Devices & services, Kiosk Satellite "
                "(ESPHome). If an old copy of the clock stays unavailable there, remove it.",
-               "A dashboard made for the clock's small screen: " + doc("dashboard/README.md"),
+               "A dashboard made for the clock's small screen, installed with HACS:\n  https://github.com/TRusselo/lenovo-clock-dashboard",
                "If a dashboard shows times an hour off: " + doc("docs/TIMEZONES.md"),
                "Questions: see " + doc("README.md", "Questions, problems, or it worked?")]
 

@@ -35,7 +35,7 @@ The tool checks the model over Wi-Fi before it changes anything there, and refus
 
 | | Stock | After |
 |---|---|---|
-| Screen | Google's clock face | Your Home Assistant dashboard, with [one made for this screen](dashboard/README.md) |
+| Screen | Google's clock face | Your Home Assistant dashboard, with [one made for this screen](https://github.com/TRusselo/lenovo-clock-dashboard) (HACS) |
 | Assistant | Google, in the cloud | Off. Home Assistant voice is planned, not yet tested |
 | Music | Cast | Music Assistant (Sendspin), volume buttons work |
 | Clock | Wrong after DST rule changes | Right, with a fixed-offset zone ([how](docs/TIMEZONES.md)) |

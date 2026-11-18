@@ -714,9 +714,9 @@ def test_one_box_on_screen_at_a_time_and_the_reason_carries_over(monkeypatch):
 def test_links_stand_out_on_their_own_line(monkeypatch):
     from lck import doc
     ui, out = _tty_ui(monkeypatch)
-    ui.section("What's next", ["A dashboard: " + doc("dashboard/README.md")])
+    ui.section("What's next", ["Time zones: " + doc("docs/TIMEZONES.md")])
     text = out.getvalue()
-    assert "\n" in text.split("dashboard/README.md", 1)[1].split("https://", 1)[0]
+    assert "\n" in text.split("docs/TIMEZONES.md", 1)[1].split("https://", 1)[0]
     assert "\x1b[4;38;5;80mhttps://" in text
 
 
