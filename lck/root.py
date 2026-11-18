@@ -122,6 +122,8 @@ def open_magisk(ctx, tries: int = 3, sleep=time.sleep) -> None:
     """Open the Magisk app on the clock's screen, and check it's in front: right after a restart
     the first launch can be lost or covered (e2e runs 3 and 4)."""
     for _ in range(tries):
+        # On a clock not linked to Google, Cast's setup screen keeps opening over Magisk (e2e run 6).
+        shell(ctx, "am", "force-stop", "com.google.android.apps.mediashell", check=False)
         shell(ctx, "monkey", "-p", MAGISK_PKG, "-c", "android.intent.category.LAUNCHER", "1", check=False)
         sleep(3)
         if front_app(ctx).startswith(MAGISK_PKG):
@@ -131,6 +133,7 @@ def open_magisk(ctx, tries: int = 3, sleep=time.sleep) -> None:
 class RootStep(Step):
     name = "root"
     title = "Root the clock with Magisk"
+    recover = staticmethod(clock.recover_if_lost)   # lost the clock: wait, then start again
 
     def done(self, ctx) -> bool:
         return clock.has_root(ctx)
@@ -159,7 +162,7 @@ class RootStep(Step):
     def _first_run(self, ctx) -> None:
         old = clock.boot_id(ctx)
         open_magisk(ctx)
-        ctx.ui.physical("Magisk is open on the clock (it may open sideways: that's fine). If it says Requires "
+        ctx.ui.physical("Magisk is open on the clock. If it says Requires "
                         "Additional Setup, **tap OK**. Touch nothing else: the clock restarts by itself, and the tool "
                         "waits for it. If it doesn't ask (its setup was done on an earlier try), there's nothing to "
                         "tap. Close any popup offering to patch: that's done already.")
@@ -171,7 +174,7 @@ class RootStep(Step):
         settle(ctx)
         shell(ctx, "su", "-c", "id", check=False, timeout=30)   # asks Magisk, which logs the request
         open_magisk(ctx)
-        ctx.ui.physical("Now let adb use root. In Magisk (it may be sideways: that's fine), open the Superuser tab "
+        ctx.ui.physical("Now let adb use root. In Magisk, open the Superuser tab "
                         "(the shield at the bottom):\n"
                         "  1. Tap + (add)\n"
                         "  2. Tick Shell in the list\n"

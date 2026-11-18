@@ -17,10 +17,11 @@ rather do it by hand, or if you're an AI agent following along.
 - **Cable:** USB **A-to-A**, straight-through (no chip in the middle), into the clock's USB port.
 - **Modes.** The screen stays **dark** in all of them. Unplug the barrel power, hold the button(s), plug the power
   in. Find the mode from the USB device list (`lsusb`):
-  - **fastboot:** hold **VOLUME UP**, keep holding 20 to 30 seconds. `0bb4:0c01`.
-  - **BROM:** hold **VOLUME UP and VOLUME DOWN together**, about 5 seconds. `0e8d:0003`. It often takes two or
-    three tries. One button alone gives the preloader, `0e8d:2000`, which mtkclient handles badly on this clock:
-    unplug and try again.
+  - **fastboot:** hold **VOLUME UP**, keep holding about 10 seconds (it passes through BROM at 3 to 5). `0bb4:0c01`.
+  - **BROM:** hold **VOLUME UP**, about 5 seconds, with mtkclient already waiting (it keeps the clock there).
+    `0e8d:0003`. Both volume buttons also work. VOLUME DOWN alone gives the preloader, `0e8d:2000`, which
+    mtkclient handles badly on this clock: unplug and try again. A clock left held by an earlier mtkclient session
+    shows `0e8d:2001`: unplug its power before the next session, or it reads 0 bytes.
   - One mtkclient command per BROM power-cycle. Several commands go in one with `mtk.py multi "a;b"`.
   - The clock never shows up as adb on USB: under Android its port is host-only. adb runs over Wi-Fi.
 - **LK's fastboot hangs** on the `getvar` queries the stock `fastboot` client sends before a flash. Flash with
@@ -278,6 +279,11 @@ volume keys change the volume (Lenovo's Things app handles both).
 Things app is.
 
 ## Restore
+
+**Never factory reset the clock to go back.** A reset while it's online unlinks it from your Google account on
+Google's side, and no restore can undo that: the clock then sits on Google's setup screen, and Cast's setup keeps
+opening over other apps. Use `lck restore`. To get the stock clock face back after a reset, set the clock up again
+in the Google Home app.
 
 - **A backup, back on its own clock:** `lck restore backup/clock.zip`. It reads the clock's partition table in
   BROM first and stops unless the disk GUID and layout match the backup. Then, in BROM again, it writes `boot`,

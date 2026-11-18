@@ -69,9 +69,22 @@ The clock runs on its barrel plug; the USB cable alone doesn't start it.
 
 ## If BROM mode won't come
 
-- Hold **both** volume buttons, then plug in the power, and keep holding about 5 seconds. One button alone gives
-  the preloader: the tool says so, and starts again.
-- It often takes two or three tries. Unplug the power fully each time.
+- Hold **VOLUME UP**, then plug in the power, and keep holding about 5 seconds, or until "Clock mode" says BROM.
+  (Both volume buttons work too. VOLUME DOWN alone gives the preloader: the tool says so, and starts again.)
+- It can take two or three tries. Unplug the power fully each time.
+- If a try fails, the tool says why and starts the next one on a fresh screen. If the clock is still held by the
+  last try, it asks you to unplug the power first.
+
+## Copying text from the terminal
+
+Use **Ctrl+Shift+C**: Ctrl-C alone stops the tool. During a long BROM job, one Ctrl-C only asks; a second one
+within 5 seconds stops it.
+
+## Going back to stock
+
+Use `lck restore`, never the clock's own factory reset. A reset while online unlinks the clock from your Google
+account, which no restore can undo: it then stays on Google's setup screen until you set it up again in Google
+Home.
 - Check the cable: straight-through A-to-A, into the clock's USB port.
 
 ## Why everything after the flash is over Wi-Fi

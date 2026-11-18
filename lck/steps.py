@@ -56,6 +56,9 @@ class Context:
         return self.state.get("serial") or "unknown"
 
 
+RECOVERIES = 3     # times a step that lost the clock starts again before the run stops
+
+
 class Step:
     name = "step"
     title = "Step"
@@ -140,11 +143,21 @@ def run_steps(steps: list[Step], ctx: Context, *, start_from: str | None = None,
         if shown:
             # Numbered like the headings in the manual (devices/cube/README.md).
             ctx.ui.screen(titles, number, done_numbers(), skipped_numbers)
-        if step.done(ctx):
-            if ctx.ui is not None:
-                ctx.ui.say(f"Already done on the clock: {step.title}.")
-        else:
-            step.run(ctx)
+        for attempt in range(RECOVERIES + 1):
+            try:
+                if step.done(ctx):
+                    if ctx.ui is not None:
+                        ctx.ui.say(f"Already done on the clock: {step.title}.")
+                else:
+                    step.run(ctx)
+                break
+            except Exception as e:
+                # e2e run 6: a power cut mid-step stopped setup, though the clock was back in a minute.
+                # A step that can tell it lost the clock waits for it and starts again.
+                recover = getattr(step, "recover", None)
+                if attempt < RECOVERIES and recover is not None and recover(ctx, e):
+                    continue
+                raise
         done.append(step.name)
         _save(ctx, done)
         if shown:

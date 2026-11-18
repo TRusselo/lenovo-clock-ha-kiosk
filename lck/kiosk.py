@@ -150,6 +150,7 @@ def push_with_progress(ctx, local: Path, remote: str, text: str, sleep=time.slee
 class InstallStep(Step):
     name = "kiosk-install"
     title = "Install Kiosk Satellite"
+    recover = staticmethod(clock.recover_if_lost)   # lost the clock: wait, then start again
 
     def done(self, ctx) -> bool:
         return "package:" in shell(ctx, "pm", "path", PKG, check=False)
@@ -177,6 +178,7 @@ def is_device_owner(ctx) -> bool:
 class GrantsStep(Step):
     name = "kiosk-grants"
     title = "Give Kiosk Satellite its permissions and make it device owner"
+    recover = staticmethod(clock.recover_if_lost)   # lost the clock: wait, then start again
 
     def done(self, ctx) -> bool:
         return is_device_owner(ctx) and "allow" in shell(
@@ -203,6 +205,7 @@ def home_app(ctx) -> str:
 class SettingsStep(Step):
     name = "kiosk-settings"
     title = "Set up Kiosk Satellite on the clock"
+    recover = staticmethod(clock.recover_if_lost)   # lost the clock: wait, then start again
 
     def done(self, ctx) -> bool:
         return home_app(ctx).startswith(PKG + "/")

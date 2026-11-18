@@ -751,7 +751,7 @@ def test_step_one_asks_yes_or_no_and_no_means_typed_later(tmp_path, monkeypatch)
     ui = FakeUI(["maybe", "no"])
     c = ctx_for(tmp_path, ui=ui)
     assert system.ask_wifi_ready(c) is False
-    assert any("Google Home app before typing YES" in l for l in ui.lines)
+    assert any("Google Home app before typing **YES**" in l for l in ui.lines)
     c.state["wifi_ready"] = False
     c.ui = FakeUI(["Home", "secret-pass"])
     images.ensure_wifi(c)                                      # no backup look: asked straight away
@@ -797,3 +797,86 @@ def test_no_wifi_retry_offered_when_the_backup_brought_the_wifi(tmp_path, monkey
     c = ctx_for(tmp_path, ui=ui, wifi_ready=True)
     assert system.ask_ip(c) is None and c.state["ip"] == "10.0.0.9"
     assert not any("mistyped" in l for l in ui.lines)
+
+
+def test_a_step_that_loses_the_clock_waits_and_starts_again(tmp_path, monkeypatch):
+    # e2e run 6: a power cut during the install's copy stopped setup; the clock was back in a minute.
+    import subprocess
+    from lck.steps import Step, run_steps
+    waited = []
+    monkeypatch.setattr(clock, "wait_booted", lambda ctx, **kw: waited.append(1))
+
+    class Flaky(Step):
+        name, title = "flaky", "Flaky"
+        recover = staticmethod(clock.recover_if_lost)
+        runs = 0
+
+        def run(self, ctx):
+            Flaky.runs += 1
+            if Flaky.runs == 1:
+                raise subprocess.TimeoutExpired(["adb", "shell", "stat"], 15)
+    ui = FakeUI()
+    c = ctx_for(tmp_path, ui=ui, ip="10.0.0.7")
+    run_steps([Flaky()], c)
+    assert Flaky.runs == 2 and waited == [1] and any("Lost the clock" in l for l in ui.lines)
+
+
+def test_errors_read_as_words_not_command_lists():
+    import subprocess
+    from lck.cli import plain_error
+    from lck.runner import CommandFailed
+    msg = plain_error(subprocess.TimeoutExpired(["/x/adb", "-s", "1.2.3.4:5555", "shell", "stat"], 15))
+    assert msg.startswith("adb got no answer within 15 seconds") and "[" not in msg
+    msg = plain_error(CommandFailed(["/x/adb", "shell", "cp"], Result(1, "line one\ncp: denied\n")))
+    assert msg == "adb failed: cp: denied"
+
+
+def test_a_clock_still_held_from_the_last_session_is_unplugged_first(tmp_path):
+    # e2e run 6: mtkclient attached to the leftover download agent and read 0 bytes, 3 times.
+    seq = iter([[Mode.DA], [Mode.DA], []])
+    ui = FakeUI()
+    mtk.release_stale(ctx_for(tmp_path, ui=ui, detect=lambda: next(seq)), sleep=lambda s: None)
+    assert any("still held" in l for l in ui.lines) and any("unplugged" in l for l in ui.lines)
+    assert not mtk._ok("Dumped sector 0/addr 0x0 with flash size 0x0 as full_user.bin.", ["rf full_user.bin"])
+    assert "still held" in mtk.why_failed("flash size 0x0")
+    assert "USB connection dropped" in mtk.why_failed("usb.core.USBError: [Errno 19] No such device")
+
+
+def test_one_ctrl_c_during_brom_only_asks(tmp_path):
+    ui = FakeUI()
+    c = ctx_for(tmp_path, ui=ui)
+    state = {}
+
+    def interrupted(s):
+        raise KeyboardInterrupt
+    mtk._guarded(c, interrupted, 1, state)               # the first: a question, no stop
+    assert any("Ctrl+Shift+C" in l for l in ui.lines)
+    with pytest.raises(KeyboardInterrupt):
+        mtk._guarded(c, interrupted, 1, state)           # the second, within 5 s: stops
+
+
+def test_only_the_innermost_spinner_draws(monkeypatch):
+    import time as _time
+    ui, out = _tty_ui(monkeypatch)
+    with ui.busy("Outer"):
+        _time.sleep(0.25)
+        mark = len(out.getvalue())
+        with ui.busy("Inner"):
+            _time.sleep(0.35)
+        inner_part = out.getvalue()[mark:].split("Inner", 1)[1].split("\n", 1)[0]
+    assert "Outer" not in inner_part
+
+
+def test_what_the_person_is_told_and_answers_is_logged_but_not_secrets():
+    import io, logging
+    from lck.ui import UI
+    stream = io.StringIO()
+    logger = logging.getLogger("lck.test-ui-log")
+    logger.handlers[:] = [logging.StreamHandler(stream)]
+    logger.setLevel(logging.INFO)
+    ui = UI(stdin=io.StringIO("10.0.0.7\nhunter22\n"), stdout=io.StringIO(), logger=logger)
+    ui.say("That didn't take: the USB connection dropped.")
+    ui.ask("Type the clock's address: ")
+    ui.ask_secret("Wi-Fi password: ")
+    log = stream.getvalue()
+    assert "USB connection dropped" in log and "ANSWER 10.0.0.7" in log and "hunter22" not in log

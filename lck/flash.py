@@ -127,8 +127,8 @@ class FlashStep(Step):
                 raise FlashFailed("Stopped before flashing. Nothing was changed." + (" " + hint if hint else ""))
         fbmulti(ctx, pairs, title="Flashing slot A, about 2 minutes")
         restart_from_fastboot(ctx)
-        ctx.ui.keep("The clock is starting slot A. It reconnects to the Wi-Fi saved in the backup, with adb over "
-                    "Wi-Fi switched on.")
+        wifi = ("the Wi-Fi you typed" if ctx.state.get("wifi_new") else "the Wi-Fi saved in the backup")
+        ctx.ui.keep(f"The clock is starting slot A. It connects to {wifi}, with adb over Wi-Fi switched on.")
 
 
 def flash_userdata(ctx) -> None:

@@ -50,8 +50,10 @@ class RealRunner:
         if self.logger:
             self.logger.info("$ %s", " ".join(argv))
         f = open(out_file, "wb")
+        # Its own session: a Ctrl-C in the terminal (often meant as copy) reaches only this tool,
+        # which asks before stopping, instead of killing a 35-minute backup outright (e2e run 6).
         p = subprocess.Popen(argv, stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                             cwd=cwd, env=env)
+                             cwd=cwd, env=env, start_new_session=True)
         p.out_file = f
         return p
 

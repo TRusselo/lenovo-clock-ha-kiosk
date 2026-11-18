@@ -26,6 +26,36 @@ class NotAClock(Exception):
     pass
 
 
+_LOST = re.compile(r"device offline|device '[^']*' not found|no devices|closed|protocol fault|"
+                   r"Connection reset|Connection refused|failed to connect|cannot connect", re.I)
+
+
+def lost(e: BaseException) -> bool:
+    """Did this error come from losing the clock (power cut, restart, Wi-Fi drop)?"""
+    import subprocess
+    from lck.runner import CommandFailed
+    if isinstance(e, subprocess.TimeoutExpired):
+        return True
+    if isinstance(e, CommandFailed):
+        return bool(_LOST.search(e.result.out))
+    return isinstance(e, SetupFailed) and "Can't reach the clock" in str(e)
+
+
+def recover_if_lost(ctx, e: BaseException) -> bool:
+    """For steps over Wi-Fi: lost the clock, so wait for it to come back, then the step starts again."""
+    if not lost(e) or not ctx.state.get("ip"):
+        return False
+    if ctx.ui is not None:
+        ctx.ui.say("Lost the clock: it may have restarted, or lost power or Wi-Fi. Waiting for it to come back; "
+                   "then this step starts again.")
+    log = ctx.state.get("log")
+    if log:
+        log.info("lost the clock (%s); waiting, then redoing the step", type(e).__name__)
+    _run(ctx, "disconnect", address(ctx), check=False, timeout=15)
+    wait_booted(ctx, why="the clock to come back")
+    return True
+
+
 def address(ctx) -> str | None:
     ip = ctx.state.get("ip")
     return f"{ip}:{PORT}" if ip else None

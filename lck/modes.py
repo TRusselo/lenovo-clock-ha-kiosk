@@ -164,9 +164,11 @@ def wait_for_mode(target: Mode, ctx, *, prompt: str, timeout: float = 180,
         sleep(POLL_SECONDS)
 
 
-BROM_PROMPT = ("For **BROM mode**: unplug the clock's round power plug. Hold VOLUME UP and VOLUME DOWN together, "
-               "plug the power back in, and keep holding for **about 5 seconds**, or until Clock mode says BROM, then let go. The screen stays "
-               "dark. It often takes two or three tries.")
+# VOLUME UP alone reaches BROM: every catch in e2e run 6 used it (BROM is on the way to fastboot,
+# and mtkclient, already waiting, keeps the clock there).
+BROM_PROMPT = ("For **BROM mode**: unplug the clock's round power plug. Hold VOLUME UP, plug the power back in, and "
+               "keep holding for **about 5 seconds**, or until Clock mode says BROM, then let go. The screen stays "
+               "dark. It can take two or three tries.")
 BROM_AGAIN = ("BROM mode again, this time to write. " + BROM_PROMPT)
 FASTBOOT_PROMPT = ("For **fastboot mode**: unplug the clock's round power plug. Hold VOLUME UP, plug the power back "
                    "in, and keep holding for **about 10 seconds**, until the tool says it found the clock. On "

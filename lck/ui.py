@@ -77,7 +77,7 @@ def _elapsed(seconds: float) -> str:
 
 
 class UI:
-    def __init__(self, stdin=None, stdout=None):
+    def __init__(self, stdin=None, stdout=None, logger=None):
         self.stdin = stdin or sys.stdin
         self.stdout = stdout or sys.stdout
         self._status_shown = False
@@ -87,6 +87,8 @@ class UI:
         self._intro = []      # stays on each screen until the user is first needed
         self._kept = []       # shown once more, on the next screen
         self._last = None     # the last screen drawn, for redraw()
+        self._spinners = []   # busy jobs, innermost last: only it draws
+        self.logger = logger  # what the person was told and answered goes in the run log (e2e run 6)
         self._box_shown = False   # an "On the clock" box is on the current screen
         self._since_box = []      # what was said under it, carried over when the next box redraws
 
@@ -155,7 +157,12 @@ class UI:
         if self._live():
             self._kept.append(text)
 
+    def _log(self, kind: str, text: str) -> None:
+        if self.logger:
+            self.logger.info("%s %s", kind, plain(text).replace("\n", " / "))
+
     def say(self, text: str) -> None:
+        self._log("SAY", text)
         self._end_status()
         if self._box_shown:
             self._since_box.append(text)
@@ -167,6 +174,7 @@ class UI:
         """Something to do with your hands, at the clock. One box on screen at a time: a second
         box in the same step redraws the screen first (e2e run 5: two boxes, easy to read the
         wrong one)."""
+        self._log("BOX", text)
         self._end_status()
         self._users_turn()
         if self._live() and self._box_shown:
@@ -303,6 +311,7 @@ class UI:
     def alert(self, text: str) -> None:
         """Something easy to miss that matters: bold yellow on a terminal.
         Callers write it in capitals, so it stands out without colour too."""
+        self._log("ALERT", text)
         self._end_status()
         if self._live():
             self.stdout.write(f"\n{_YELLOW}{self._buttons(self._wrap(text), _YELLOW)}{_RESET}\n")
@@ -337,18 +346,31 @@ class UI:
         start = time.monotonic()
         stop = threading.Event()
 
+        self._spinners.append(job)
+
         def spin():
             i = 0
             while True:
+                if self._spinners and self._spinners[-1] is not job:
+                    # One spinner at a time: an inner job draws, this one waits (e2e run 6: two lines
+                    # redrawing each other at 30 a second).
+                    if stop.wait(0.1):
+                        return
+                    continue
                 took = time.monotonic() - start
                 time_text = f"  {_elapsed(took)}"     # from 0s: a timer that appears at 3s reads as late
                 note = f"  {job.detail}" if job.detail else ""
                 bar = f"  {self._bar(job.fraction)}" if job.fraction is not None else ""
                 # Stay inside one row: a wrapped line can't be redrawn with \r.
                 room = shutil.get_terminal_size((80, 24)).columns - 1 - 4 - len(time_text) - (14 if bar else 0)
-                label = text + note
-                label = label if len(label) <= room else label[:max(room - 3, 0)] + "..."
-                shown = label[:len(text)] + bar + self._paint(_DIM, label[len(text):]) if len(label) > len(text) else label
+                # Cut the words, never the bar (e2e run 6: "about 35 minut..  bar ."): the bar goes after them.
+                head, tail = text, note
+                if len(head) + len(tail) > room:
+                    if len(head) > room - 3:
+                        head, tail = head[:max(room - 3, 0)] + "...", ""
+                    else:
+                        tail = tail[:max(room - len(head) - 3, 0)] + "..."
+                shown = head + bar + self._paint(_DIM, tail)
                 extra = f"  {self._paint(_DIM, time_text.strip())}" if time_text else ""
                 self.stdout.write(f"\r\x1b[K  {self._paint(_PURPLE, sym['spin'][i % len(sym['spin'])])} "
                                   f"{shown}{extra}")
@@ -365,6 +387,8 @@ class UI:
         finally:
             stop.set()
             t.join()
+            if job in self._spinners:
+                self._spinners.remove(job)
             took = _elapsed(time.monotonic() - start)
             if ok and job.paused:
                 self.stdout.write(f"\r\x1b[K  {self._paint(_YELLOW, '! ' + job.final)}\n")
@@ -401,6 +425,7 @@ class UI:
 
     def ask_secret(self, text: str) -> str:
         """A question whose answer isn't shown as it's typed, and never logged (a Wi-Fi password)."""
+        self._log("ASK", text + " (answer not logged)")
         self._end_status()
         self._users_turn()
         shown = f"{_YELLOW}{self._buttons(self._wrap(text.rstrip(' ')), _YELLOW)}{_RESET} " if self._live() else plain(text)
@@ -412,15 +437,29 @@ class UI:
         return self.stdin.readline().rstrip("\r\n")
 
     def ask(self, text: str) -> str:
+        self._log("ASK", text)
         self._end_status()
         self._users_turn()
-        if self._live():
-            # Your turn: yellow, like the boxes, wrapped to the terminal.
-            text = f"{_YELLOW}{self._buttons(self._wrap(text.rstrip(' ')), _YELLOW)}{_RESET} "
-        self.stdout.write(plain(text))
-        self.stdout.flush()
-        line = self.stdin.readline()
-        return line.rstrip("\r\n")
+        if self._live() and self.stdin is sys.stdin and sys.stdin.isatty():
+            # The question on its own lines, the answer after a short "> " with line editing:
+            # typing that wrapped past the line couldn't be backspaced (e2e run 6).
+            self.stdout.write(f"{_YELLOW}{self._buttons(self._wrap(text.rstrip(' ')), _YELLOW)}{_RESET}\n")
+            self.stdout.flush()
+            try:
+                import readline  # noqa: F401  (line editing for input())
+            except ImportError:
+                pass
+            line = input("  > ")
+        else:
+            if self._live():
+                # Your turn: yellow, like the boxes, wrapped to the terminal.
+                text = f"{_YELLOW}{self._buttons(self._wrap(text.rstrip(' ')), _YELLOW)}{_RESET} "
+            self.stdout.write(plain(text))
+            self.stdout.flush()
+            line = self.stdin.readline()
+        line = line.rstrip("\r\n")
+        self._log("ANSWER", line)
+        return line
 
 
 class Job:

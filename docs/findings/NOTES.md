@@ -126,3 +126,19 @@ Evidence labels: **Observed** (read on a real clock or its backup), **Reported**
   `vbmeta_a`/`_b` are signed (SHA512_RSA4096) with flags 0, and its `boot_a`/`_b` are unpatched: the Smart
   Display's relock gate would pass. Left out because a failed re-unlock may not be undoable by `lck restore` if
   LK keeps the lock state where BROM writes can't reach (RPMB: **Guess**).
+
+## From e2e run 6 (2026-11-18)
+
+- **VOLUME UP alone reaches BROM** with mtkclient already waiting: every catch that day used it. **Observed.**
+- A clock left held by a stopped mtkclient session shows `0e8d:2001`; a new session attaches to that leftover
+  download agent, reads "flash size 0x0" and 0-byte files, and exits 0. Only unplugging the power frees it.
+  **Observed** (twice).
+- On a clock not linked to a Google account, Cast's setup screen (`CastWebContentsActivity`) opens over other apps
+  within seconds; `am force-stop com.google.android.apps.mediashell` before opening an app keeps it away.
+  **Observed.**
+- `settings put system accelerometer_rotation 0` and `user_rotation 1` (adb, no root) turn the whole system to
+  landscape, the right way up: Magisk came up landscape for the first time. **Observed.**
+- Google's setup screen shows a line at the top, "Build=…, IP=…, Channel=…", and "Can't connect to Wi-Fi" when the
+  saved network won't join. **Observed.**
+- A factory reset while online unlinks the clock from Google on Google's side; a restore can't relink it.
+  **Observed.**

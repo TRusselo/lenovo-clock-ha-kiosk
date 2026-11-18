@@ -129,7 +129,7 @@ def backup(ctx, out: Path) -> None:
     raw.unlink()
     (out / "mtk-output.txt").unlink(missing_ok=True)
     ctx.ui.keep(f"Backup complete: {out}. Keep it private: it holds data unique to this clock, and its "
-                "Wi-Fi password.")
+                "Wi-Fi details, if it has any.")
 
 
 def _complete_dump(out: Path) -> bool:

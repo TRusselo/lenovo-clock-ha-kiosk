@@ -102,6 +102,7 @@ class BackupStep(Step):
 class VerifyStep(Step):
     name = "verify"
     title = "Final check"
+    recover = staticmethod(clock.recover_if_lost)   # lost the clock: wait, then start again
 
     def run(self, ctx) -> None:
         clock.require_clock(ctx)

@@ -65,8 +65,24 @@ def prepare(ctx) -> None:
                        timeout=1800)
 
 
+STALE = ("The clock is still held by the last try. Unplug its round power plug, wait 3 seconds, then do the "
+         "steps below.")
+
+
+def why_failed(text: str) -> str:
+    """The reason an attempt failed, in words (e2e run 6: retries gave none)."""
+    if "flash size 0x0" in text or "Couldn't detect partition" in text:
+        return "the clock was still held by the last try, so nothing could be read. Nothing was written"
+    if "USBError" in text or "Errno 19" in text or "Errno 5" in text:
+        return "the USB connection dropped. Nothing was written"
+    if not text.strip():
+        return "the clock didn't reach BROM mode"
+    return "mtkclient stopped early. Nothing was written"
+
+
 def _ok(text: str, commands: list[str]) -> bool:
-    if "Failed to" in text or "Error: Couldn't" in text or "Traceback" in text:
+    if ("Failed to" in text or "Error: Couldn't" in text or "Traceback" in text
+            or "flash size 0x0" in text):    # a leftover download agent reads 0 bytes (e2e run 6)
         return False
     for c in commands:
         word = c.split()[0]
@@ -75,6 +91,21 @@ def _ok(text: str, commands: list[str]) -> bool:
         if word == "w" and f"Wrote {c.split()[2]}" not in text:
             return False
     return True
+
+
+def release_stale(ctx, sleep=time.sleep) -> None:
+    """A clock still in BROM or held by mtkclient's download agent from a stopped or failed session
+    (0e8d:2001) makes the next session read nothing. Only unplugging it frees it (e2e run 6)."""
+    try:
+        mode = current(ctx)
+    except Exception:
+        return
+    if mode in (Mode.DA, Mode.BROM, Mode.PRELOADER):
+        ctx.ui.physical(STALE)
+        with ctx.ui.busy("Waiting for the clock's power to be unplugged") as job:
+            while current(ctx) != Mode.NONE:
+                sleep(0.5)
+            job.done("The clock is unplugged")
 
 
 def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str = BROM_PROMPT,
@@ -88,11 +119,14 @@ def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str 
     cwd.mkdir(parents=True, exist_ok=True)
     args = [*_python(ctx), script(ctx)]
     args += ["multi", ";".join(commands)] if len(commands) > 1 else commands[0].split()
+    logger = ctx.state.get("log")
     for attempt in range(1, TRIES + 1):
+        release_stale(ctx, sleep)
         log = cwd / "mtk-output.txt"
         proc = ctx.runner.spawn(args, out_file=log, cwd=cwd)
         try:
             ctx.ui.physical(prompt)
+            ctx.ui.status("waiting for BROM")
             text = _follow(ctx, proc, log, title, sleep, timeout, commands, prompt, weights)
         except MtkFailed:
             text = ""
@@ -105,12 +139,28 @@ def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str 
         if "error: " in text and "usage:" in text:
             # mtkclient refused the command line itself: retrying can't help.
             raise MtkFailed("mtkclient didn't accept its command. Please report this, with the log.")
+        reason = why_failed(text)
+        if logger:
+            logger.info("BROM attempt %d of %d failed: %s", attempt, TRIES, reason)
         if attempt == TRIES:
-            raise MtkFailed(f"mtkclient didn't finish after {TRIES} tries. The last lines of its "
-                            "output are in the log.")
-        ctx.ui.redraw()
-        ctx.ui.say("That didn't take. Let's try again, from the start:")
+            raise MtkFailed(f"mtkclient didn't finish after {TRIES} tries (the last time: {reason}). The last "
+                            "lines of its output are in the log.")
+        ctx.ui.redraw()       # a fresh screen: no old "Clock mode" lines (e2e run 6)
+        ctx.ui.keep(f"That didn't take: {reason}. Try {attempt + 1} of {TRIES}, from the start:")
     raise AssertionError("unreachable")
+
+
+def _guarded(ctx, sleep, seconds, state) -> None:
+    """Sleep, but a single Ctrl-C (often meant as copy) only asks: a second one within 5 seconds stops."""
+    try:
+        sleep(seconds)
+    except KeyboardInterrupt:
+        now = time.monotonic()
+        if now - state.get("ctrl_c", -99.0) < 5:
+            raise
+        state["ctrl_c"] = now
+        ctx.ui.say("Press Ctrl-C again within 5 seconds to stop. (To copy text from the terminal, use "
+                   "Ctrl+Shift+C.)")
 
 
 def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, prompt: str,
@@ -119,6 +169,7 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
     last = None
     hinted = nothing_hinted = False
     reprompts = 1
+    guard: dict = {}
     while proc.poll() is None:
         try:
             mode = current(ctx)
@@ -153,7 +204,7 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
         if waited > timeout:
             proc.kill()
             break
-        sleep(0.25)
+        _guarded(ctx, sleep, 0.25, guard)
     if proc.poll() is None and last == Mode.DA.value:
         ctx.ui.say("Connected. Leave the clock plugged in until this finishes.")
         with ctx.ui.busy(title) as job:
@@ -163,7 +214,7 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
                     job.note(f"{pct:.0f}%", pct, 100)
                 if time.monotonic() - start > timeout:
                     proc.kill()
-                sleep(1)
+                _guarded(ctx, sleep, 1, guard)
             text = ctx.runner.finished(proc)
             if proc.returncode != 0 or not _ok(text, commands):
                 raise MtkFailed("mtkclient stopped with an error")

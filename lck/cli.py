@@ -55,7 +55,7 @@ def _context(args) -> Context:
     paths = Paths(args.workdir)
     logger = log.setup(paths.logs / f"{args.name}.log")
     logger.info("%s %s", RUN_MARK, " ".join(sys.argv[1:]) or args.command)
-    ctx = Context(runner=RealRunner(logger=logger), ui=UI(), paths=paths,
+    ctx = Context(runner=RealRunner(logger=logger), ui=UI(logger=logger), paths=paths,
                   state={"progress_id": args.name, "log": logger})
     if getattr(args, "ip", None):
         ctx.state["ip"] = args.ip
@@ -209,11 +209,26 @@ def main(argv=None) -> int:
         return 130
     except Exception as e:  # every failure ends in plain words, not a traceback
         _log_error(args, str(e))
-        print(f"\nStopped: {e}", file=sys.stderr)
+        print(f"\nStopped: {plain_error(e)}", file=sys.stderr)
         _print_log_tail(args)
         print("Run the same command again to retry this step.", file=sys.stderr)
         _stuck(args, str(e))
         return 1
+
+
+def plain_error(e: BaseException) -> str:
+    """No Python command lists on screen (e2e run 6): what failed, in words. The log has the command."""
+    import subprocess
+    from lck.runner import CommandFailed
+    if isinstance(e, subprocess.TimeoutExpired):
+        tool = Path(str(e.cmd[0] if isinstance(e.cmd, (list, tuple)) else e.cmd)).name
+        return (f"{tool} got no answer within {e.timeout:.0f} seconds. The clock may have restarted, or lost power "
+                "or Wi-Fi.")
+    if isinstance(e, CommandFailed):
+        tool = Path(e.args_[0]).name
+        last = [l for l in e.result.out.strip().splitlines() if l.strip()][-1:] or ["no output"]
+        return f"{tool} failed: {last[0].strip()}"
+    return str(e)
 
 
 def _stuck(args, said: str = "") -> None:

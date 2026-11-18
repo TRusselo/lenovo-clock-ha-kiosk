@@ -33,10 +33,12 @@ IME_PKG = "rkr.simplekeyboard.inputmethod"
 WHY_WIFI = ("From here on the tool talks to the clock over Wi-Fi: once Android runs, the clock's USB port "
             "only works as a host, so the computer can't reach it over the cable.")
 WHERE_IP = ("On the clock, swipe up from the bottom, tap the gear (Settings), then About device: the address is "
-            "under IP address. Your router's list of devices shows it too.")
-WHERE_IP_FIRST_START = ("Wait until the clock shows its clock face: the first start takes a few minutes. Then swipe "
-                        "up from the bottom, tap the gear (Settings), then About device: the address is under IP "
-                        "address. Your router's list of devices shows it too.")
+            "under IP address. If the clock shows Google's setup screen instead, the address is in the line at its "
+            "top (IP=…). Your router's list of devices shows it too.")
+WHERE_IP_FIRST_START = ("Wait until the clock has started (the first start takes a few minutes): it shows its clock "
+                        "face, or Google's setup screen. On the setup screen, the address is in the line at the top "
+                        "(IP=…). Otherwise swipe up from the bottom, tap the gear (Settings), then About device: the "
+                        "address is under IP address. Your router's list of devices shows it too.")
 ASK_IP = "Type the clock's address, such as 10.0.0.23, and press Enter: "
 ASK_IP_OR_WIFI = "Type the clock's address, such as 10.0.0.23, or type wifi to enter the Wi-Fi again: "
 
@@ -47,8 +49,9 @@ def channel(ctx) -> str:
     return lines[-1] if lines else ""
 
 
-WIFI_RETRY = ("If the clock shows its clock face but has no address (About device shows no IP address), it didn't "
-              "get on the Wi-Fi: the name or password may have been mistyped. Type wifi to enter them again: the "
+WIFI_RETRY = ("If the clock says \"Can't connect to Wi-Fi\", or has no address (no IP= at the top of the setup "
+              "screen, none under About device), it didn't get on the Wi-Fi: the name or password may have been "
+              "mistyped. Type wifi to enter them again: the "
               "tool rebuilds the user data and writes only that again, in fastboot mode.")
 
 
@@ -78,7 +81,8 @@ WIFI_WHY = ("After the flash, the tool can only reach the clock over Wi-Fi (once
             "be used), on the network the clock is connected to when it's backed up. A network it saved once isn't "
             "enough: it has to be one that works now.")
 WIFI_QUESTION = ("Is the clock booted and connected to Wi-Fi? If not, connect it to Wi-Fi using the Google Home app "
-                 "before typing YES. Or you can type NO, and enter your Wi-Fi name and password in the tool later: ")
+                 "before typing **YES**. Or you can type **NO**, and enter your Wi-Fi name and password in the tool "
+                 "later: ")
 WIFI_SAVED_BACKUP = ("A backup of this clock is already saved, and the setup uses it as it is: answer for the clock as "
                      "it was when that backup was made.")
 
@@ -169,9 +173,11 @@ def check_saved_ip(ctx) -> None:
 class ConnectStep(Step):
     name = "connect"
     title = "Find the clock on Wi-Fi and check it started slot A"
+    recover = staticmethod(clock.recover_if_lost)   # lost the clock: wait, then start again
 
     def done(self, ctx) -> bool:
-        return clock.converted(ctx) and "none-channel" in channel(ctx)
+        return (clock.converted(ctx) and "none-channel" in channel(ctx)
+                and shell(ctx, "settings", "get", "system", "user_rotation", check=False).strip() == "1")
 
     def run(self, ctx) -> None:
         if not ctx.state.get("ip"):
@@ -209,6 +215,7 @@ class ConnectStep(Step):
         if "none-channel" not in channel(ctx):
             raise SetupFailed("Google's updates aren't blocked (the update channel isn't none-channel). Run "
                               "the setup again from the misc step: lck setup --from misc")
+        set_landscape(ctx)
         ctx.ui.say(f"Connected to the clock at {ctx.state['ip']}, on slot A, with Google's updates blocked.")
 
 
@@ -222,6 +229,13 @@ class ConnectStep(Step):
         images.rebuild_userdata(ctx)
         flash_userdata(ctx)
         ctx.state["ip"] = None
+
+
+def set_landscape(ctx) -> None:
+    """The clock's panel is portrait and it has no tilt sensor, so apps came up sideways (Magisk in
+    runs 4 to 6). Fixed landscape, the right way up, for everything from here (e2e run 6, test 12)."""
+    shell(ctx, "settings", "put", "system", "accelerometer_rotation", "0", check=False)
+    shell(ctx, "settings", "put", "system", "user_rotation", "1", check=False)
 
 
 def _packages(ctx, *flags: str) -> set[str]:
@@ -259,6 +273,7 @@ def cast_hidden(ctx) -> bool:
 class DegoogleStep(Step):
     name = "degoogle"
     title = "Switch off Cast, Google Assistant and the check-ins"
+    recover = staticmethod(clock.recover_if_lost)   # lost the clock: wait, then start again
 
     def done(self, ctx) -> bool:
         installed = _packages(ctx)
@@ -317,6 +332,7 @@ class DegoogleStep(Step):
 class KeyboardStep(Step):
     name = "keyboard"
     title = "Add an on-screen keyboard"
+    recover = staticmethod(clock.recover_if_lost)   # lost the clock: wait, then start again
 
     def done(self, ctx) -> bool:
         return shell(ctx, "settings", "get", "secure", "default_input_method", check=False).strip() == IME

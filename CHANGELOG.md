@@ -6,6 +6,25 @@ What changed for people converting a clock. Newest first.
 
 - **The dashboard has its own home:** [lenovo-clock-dashboard](https://github.com/TRusselo/lenovo-clock-dashboard), installed with HACS. Its copy in this repo
   is gone, so there's one place to get it and ask about it.
+### Fixes from the sixth end-to-end run (planned faults)
+- **Losing the clock no longer stops setup:** a power cut, restart or Wi-Fi drop in a step over Wi-Fi now says so,
+  waits for the clock to come back, and starts that step again (up to 3 times). Errors read as words, not command
+  lists.
+- **A clock still held by the last BROM session** is caught first: the tool asks you to unplug it and waits.
+  0-byte reads count as a failed try. Each retry says why it failed and starts on a fresh screen ("Try 2 of 5").
+- **Ctrl-C during a BROM job only asks** the first time (press again within 5 s to stop); mtkclient can't be
+  killed by it by accident. The guide says to copy with Ctrl+Shift+C.
+- **BROM with VOLUME UP alone**, as every catch in the run used.
+- **Magisk stays in front:** Cast is stopped before Magisk opens. The whole system is set to landscape, the
+  right way up, after the clock is found, so nothing comes up sideways.
+- **Typed answers** go after a short `>` on their own line, with line editing (no more backspacing problems past a
+  wrapped line). One spinner draws at a time; the bar no longer lands inside a cut-off line.
+- **The log records** what the tool said and asked, and the answers (never a password), and each BROM try with
+  its reason.
+- **YES** and **NO** in bold; the address box names the setup screen's IP= line and "Can't connect to Wi-Fi"; the
+  flash's closing line says which Wi-Fi it joins; the backup note doesn't promise a Wi-Fi password.
+- **Docs:** never factory reset to go back; use `lck restore`.
+
 ### Fixes from the fifth end-to-end run
 - **Wi-Fi is a full stop in step 1.** After the flash the clock can only be reached over Wi-Fi, on the network
   it's connected to when backed up: a network it once saved isn't enough. Step 1 asks: "Is the clock booted and
