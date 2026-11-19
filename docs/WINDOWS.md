@@ -3,8 +3,8 @@
 For Windows 10 or 11 on an Intel or AMD PC. It takes about **an hour and a quarter**, most of it waiting.
 
 > [!NOTE]
-> The clock tool was tested end to end on Linux, seven times. The Windows program is built and its tests pass on
-> Windows, but it hasn't converted a real clock yet: USB (BROM mode and fastboot) on Windows is untested. If you
+> The clock tool was tested end to end on Linux, seven times. The Windows program is new and hasn't been tried on
+> Windows yet, let alone converted a real clock: USB (BROM mode and fastboot) on Windows is untested. If you
 > try it, please say how it went, whether it worked or not, in an [issue](../../../issues) or the Smart Display
 > project's [Home Assistant Community thread](https://community.home-assistant.io/t/lenovo-smart-display-8-as-a-de-googled-ha-dashboard-running-kiosk-satellite-w-assist-working-testers-wanted/1033810).
 

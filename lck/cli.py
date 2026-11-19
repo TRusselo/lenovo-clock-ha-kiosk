@@ -47,6 +47,9 @@ def _parser() -> argparse.ArgumentParser:
 
     st = sub.add_parser("status", help="show which setup steps are done")
     common(st)
+
+    # For the release build's smoke test: the libraries --version and --dry-run never load.
+    sub.add_parser("selfcheck", help=argparse.SUPPRESS)
     return p
 
 
@@ -64,6 +67,23 @@ def _context(args) -> Context:
 
 
 RUN_MARK = "=== lck run:"
+
+
+def _selfcheck(args) -> int:
+    """zstd both ways, one sparse piece, and the libusb backend: what a frozen build could miss."""
+    import tempfile
+    from lck import sparse
+    from lck.modes import _usb_backend
+    with tempfile.TemporaryDirectory() as tmp:
+        raw = Path(tmp) / "raw.img"
+        raw.write_bytes(b"clock" * 3000 + bytes(8192))
+        backup.compress(raw, Path(tmp) / "raw.zst")
+        assert backup.zst_sha256(Path(tmp) / "raw.zst") == backup.sha256(raw), "zstd round trip"
+        pieces = sparse.write_pieces(str(raw), str(Path(tmp) / "piece"), 1 << 20)
+        assert pieces and sparse.declared_size(open(pieces[0], "rb").read(28)) == raw.stat().st_size // 4096 * 4096
+    assert _usb_backend() is not None, "no libusb backend"
+    print("selfcheck ok")
+    return 0
 
 
 def _status(args) -> int:
@@ -202,7 +222,8 @@ def _log_error(args, text: str) -> None:
 def main(argv=None) -> int:
     args = _parser().parse_args(argv)
     try:
-        return {"setup": _setup, "backup": _backup, "restore": _restore, "status": _status}[args.command](args)
+        return {"setup": _setup, "backup": _backup, "restore": _restore, "status": _status,
+                "selfcheck": _selfcheck}[args.command](args)
     except KeyboardInterrupt:
         print("\nStopped. Run the same command again to continue where you left off.", file=sys.stderr)
         _stuck(args)

@@ -579,6 +579,7 @@ def test_marked_words_are_bold_on_a_terminal_and_plain_elsewhere(monkeypatch):
         def isatty(self):
             return True
     monkeypatch.setattr(ui_mod, "_windows_vt_on", lambda: True)
+    monkeypatch.setenv("WT_SESSION", "1")   # Windows CI: the redrawn screen, as in Windows Terminal
     monkeypatch.delenv("NO_COLOR", raising=False)
     out = Tty()
     UI(stdout=out).physical("For **fastboot mode**: unplug it, then plug it back in. Hold no buttons.")
@@ -616,6 +617,7 @@ def test_bold_survives_a_phrase_wrapped_across_lines(monkeypatch):
         def isatty(self):
             return True
     monkeypatch.setattr(ui_mod, "_windows_vt_on", lambda: True)
+    monkeypatch.setenv("WT_SESSION", "1")   # Windows CI: the redrawn screen, as in Windows Terminal
     monkeypatch.setattr(ui_mod.shutil, "get_terminal_size", lambda fallback=None: __import__("os").terminal_size((40, 24)))
     out = Tty()
     UI(stdout=out).say("Then wait three seconds and then plug the power back in with no buttons held, please.")
@@ -693,6 +695,7 @@ def _tty_ui(monkeypatch):
         def isatty(self):
             return True
     monkeypatch.setattr(ui_mod, "_windows_vt_on", lambda: True)
+    monkeypatch.setenv("WT_SESSION", "1")   # Windows CI: the redrawn screen, as in Windows Terminal
     monkeypatch.delenv("NO_COLOR", raising=False)
     out = Tty()
     return UI(stdout=out), out

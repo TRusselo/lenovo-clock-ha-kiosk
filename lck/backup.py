@@ -263,7 +263,8 @@ def restore(ctx, folder: Path, work: Path) -> None:
                "again.")
     if not choose(ctx.ui, "Type restore to continue, or press Enter to stop: ", "restore"):
         raise BackupMismatch("Restore cancelled. Nothing was changed.")
-    commands = [f"w {n} {files[n].relative_to(work)}" for n in RESTORE_SET]
+    # Forward slashes on every system: mtkclient's multi splits on spaces, and the tests expect one form.
+    commands = [f"w {n} {files[n].relative_to(work).as_posix()}" for n in RESTORE_SET]
     ctx.ui.redraw()
     mtk.run_in_brom(ctx, commands, cwd=work, title="Writing the backup to the clock, about 15 minutes",
                     prompt=BROM_AGAIN, held_message=mtk.NEXT_SESSION,

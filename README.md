@@ -95,9 +95,9 @@ permission and e2fsprogs on Linux. The full guides walk you through it:
 them: [the guide](docs/GUIDE.md).
 
 > [!NOTE]
-> Tested end to end on **Linux**, on one clock, seven times. The Windows and Mac programs are built and their
-> tests pass on those systems, but they haven't converted a real clock yet: USB on Windows and macOS is untested.
-> If you try one, please say how it went, whether it worked or not.
+> Tested end to end on **Linux**, on one clock, seven times. The Windows and Mac programs are new and haven't
+> converted a real clock yet: on those systems, USB (BROM mode and fastboot) is untested. If you try one, please
+> say how it went, whether it worked or not.
 
 ### Words you'll see
 

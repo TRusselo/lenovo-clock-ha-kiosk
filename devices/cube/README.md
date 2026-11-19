@@ -38,7 +38,8 @@ rather do it by hand, or if you're an AI agent following along.
   Ubuntu, `android-tools` on Arch and Fedora), `zstd` and libusb-1.0.
 - USB access without root: [docs/LINUX.md](../../docs/LINUX.md), step 3.
 - Download and check: platform-tools, [uv](https://github.com/astral-sh/uv), mtkclient, the AVB unlock zip,
-  `at_auth_unlock.py`, `fbmulti.py`, `sparsesplit.py`, Simple Keyboard, Magisk and Kiosk Satellite.
+  `at_auth_unlock.py`, `fbmulti.py`, Simple Keyboard, Magisk and Kiosk Satellite. (By hand on Linux,
+  `img2simg` plus S7ruc7ureV01d's `sparsesplit.py` make equivalent sparse pieces to `lck.sparse.write_pieces`.)
 - mtkclient runs with `uv run --python 3.12 --with pyusb --with pycryptodome --with pycryptodomex --with colorama
   --with pyserial --with keystone-engine --with capstone --with unicorn python mtk.py ...` (its own
   `requirements.txt` pulls in a GUI you don't need).
@@ -91,8 +92,8 @@ From that slot: `boot`, `vendor`, `vbmeta`, `system`, `oem`. Keep the stock `boo
 undo for step 14. Make sparse pieces of the big ones:
 
 ```bash
-img2simg system_b.bin system.simg && python sparsesplit.py system.simg system_chunk 94371840
-img2simg oem_b.bin oem.simg       && python sparsesplit.py oem.simg oem_chunk 94371840
+python -c "from lck.sparse import write_pieces; write_pieces('system_b.bin', 'system_chunk', 94371840)"
+python -c "from lck.sparse import write_pieces; write_pieces('oem_b.bin', 'oem_chunk', 94371840)"
 ```
 
 **Check:** each piece's sparse header declares no more than its partition's size
@@ -119,7 +120,7 @@ e2fsck -fy userdata_things.img                     # replays the journal; exit c
 python -m lck.userdata userdata_things.img ~/.android/adbkey.pub
 truncate -s $((1310294*4096)) userdata_things.img  # whole blocks only
 e2fsck -fn userdata_things.img
-img2simg userdata_things.img userdata.simg && python sparsesplit.py userdata.simg userdata_chunk 94371840
+python -c "from lck.sparse import write_pieces; write_pieces('userdata_things.img', 'userdata_chunk', 94371840)"
 ```
 
 This switches on adb over Wi-Fi with your computer's key, and switches off RescueParty. The clock reconnects to

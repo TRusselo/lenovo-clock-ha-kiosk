@@ -3,8 +3,8 @@
 For Macs with Apple silicon (M1 and later). It takes about **an hour and a quarter**, most of it waiting.
 
 > [!NOTE]
-> The clock tool was tested end to end on Linux, seven times. The Mac program is built and its tests pass on a
-> Mac, but it hasn't converted a real clock yet: USB (BROM mode and fastboot) on macOS is untested. If you try it,
+> The clock tool was tested end to end on Linux, seven times. The Mac program is new and hasn't been tried on a
+> Mac yet, let alone converted a real clock: USB (BROM mode and fastboot) on macOS is untested. If you try it,
 > please say how it went, whether it worked or not, in an [issue](../../../issues) or the Smart Display project's
 > [Home Assistant Community thread](https://community.home-assistant.io/t/lenovo-smart-display-8-as-a-de-googled-ha-dashboard-running-kiosk-satellite-w-assist-working-testers-wanted/1033810).
 > If macOS blocks the program, see [If macOS blocks the program](#if-macos-blocks-the-program).

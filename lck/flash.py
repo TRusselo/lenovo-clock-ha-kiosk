@@ -26,6 +26,15 @@ from lck.steps import Step
 from lck.ui import choose
 from lck.uvrun import uv_path, uv_python
 
+# fbmulti.py (fetched, not ours to edit) asks libusb whether a kernel driver holds the interface; on
+# Windows libusb can't answer that and pyusb raises NotImplementedError, which would stop every flash.
+# This runs it unchanged, with that one question answered "no" on Windows.
+FBMULTI_SHIM = ("import runpy, sys, usb.core\n"
+                "if sys.platform.startswith('win'):\n"
+                "    usb.core.Device.is_kernel_driver_active = lambda self, interface: False\n"
+                "script = sys.argv[1]\n"
+                "sys.argv = sys.argv[1:]\n"
+                "runpy.run_path(script, run_name='__main__')\n")
 RETRIES = 3    # times fastboot is asked for again when the clock left it before the flash started
 LEFT_AFTER = 3  # one-second looks with the clock out of fastboot, nothing written, before waiting again
 FLASH_SET = {"boot_a", "vendor_a", "vbmeta_a", "system_a", "oem_a", "userdata", "misc"}
@@ -74,7 +83,7 @@ def fbmulti(ctx, pairs: list[tuple[Path, str]], *, title: str, sleep=time.sleep)
     (e2e run 7, twice). So the tool waits for the mode itself (wait_for_mode never gives up) and
     starts fbmulti.py only once the clock is there; if it still finds no device, it waits again."""
     assert_safe(pairs)
-    args = [*uv_python(uv_path(ctx), "--with", "pyusb"), fetch("fbmulti.py", ctx)]
+    args = [*uv_python(uv_path(ctx), "--with", "pyusb"), "-c", FBMULTI_SHIM, fetch("fbmulti.py", ctx)]
     args += [f"{f}={p}" for f, p in pairs]
     log = work(ctx) / "fbmulti-output.txt"
     log.parent.mkdir(parents=True, exist_ok=True)

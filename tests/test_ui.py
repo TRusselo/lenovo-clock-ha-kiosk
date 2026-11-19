@@ -35,6 +35,7 @@ def test_alert_is_coloured_on_a_terminal(monkeypatch):
     # CI's Windows runner has no real console to switch to colour mode.
     import lck.ui
     monkeypatch.setattr(lck.ui, "_windows_vt_on", lambda: True)
+    monkeypatch.setenv("WT_SESSION", "1")   # Windows CI: the redrawn screen, as in Windows Terminal
     monkeypatch.delenv("NO_COLOR", raising=False)
     out = _Tty()
     UI(stdout=out).alert("NOT DONE YET")
@@ -102,6 +103,7 @@ class _Cp1252Tty(io.TextIOWrapper):
 def _vt_on(monkeypatch):
     import lck.ui
     monkeypatch.setattr(lck.ui, "_windows_vt_on", lambda: True)
+    monkeypatch.setenv("WT_SESSION", "1")   # Windows CI: the redrawn screen, as in Windows Terminal
     monkeypatch.delenv("NO_COLOR", raising=False)
 
 

@@ -36,6 +36,7 @@ jobs:
         shell: bash
         run: |
           ./dist/lck/lck --version
+          ./dist/lck/lck selfcheck
           ./dist/lck/lck setup --dry-run --workdir "$RUNNER_TEMP/lck-smoke"
           if find dist/lck -iname 'mtk.py' -o -iname 'cygwin1.dll' | grep -q .; then echo "mtkclient and Cygwin must not be bundled"; exit 1; fi
       - name: Zip
