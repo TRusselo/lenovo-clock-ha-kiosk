@@ -28,7 +28,6 @@ from lck.ui import choose
 
 MAGISK_PKG = "com.topjohnwu.magisk"
 CAST_PKG = "com.google.android.apps.mediashell"
-MAGISK_VERSION = "31.1"   # the manifest's pin: a patch made with another Magisk isn't reused
 DEVICE_DIR = "/data/local/tmp/lck-magisk"
 FILES = {
     "assets/boot_patch.sh": "boot_patch.sh",
@@ -73,12 +72,18 @@ def stock_boot(ctx) -> Path:
     raise RootFailed(f"The backup has no stock boot image for the clock's build ({running}).")
 
 
+def made_from(boot: Path, magisk: Path) -> str:
+    """What a patched image was made from: the stock boot image and the Magisk file used, by checksum
+    (review of the run 7 fixes: a typed-in version could miss a Magisk update)."""
+    return f"{backup.sha256(boot)} {backup.sha256(magisk)}"
+
+
 def patch(ctx, boot: Path) -> Path:
     """Patch `boot` on the clock, with Magisk's script, and bring the result back."""
     out = images.work(ctx) / "images" / "boot-magisk.img"
     stamp = out.with_name(out.name + ".from")
-    made_from = f"{backup.sha256(boot)} {MAGISK_VERSION}"
-    if out.exists() and stamp.exists() and stamp.read_text() == made_from:
+    source = made_from(boot, fetch("magisk", ctx))
+    if out.exists() and stamp.exists() and stamp.read_text() == source:
         # e2e run 7: a rerun patched again each time (about 1.5 min); the result doesn't change.
         ctx.ui.say("Using the boot image Magisk patched on the last run.")
         return out
@@ -97,7 +102,7 @@ def patch(ctx, boot: Path) -> Path:
     shell(ctx, "rm", "-rf", DEVICE_DIR, check=False)
     if out.stat().st_size == 0 or out.read_bytes()[:8] != b"ANDROID!":
         raise RootFailed("The patched boot image came back damaged. Nothing was flashed.")
-    stamp.write_text(made_from)
+    stamp.write_text(source)
     return out
 
 
@@ -109,8 +114,9 @@ def magisk_booted(ctx) -> bool:
     return "not found" not in out and "No such file" not in out and out.strip() != ""
 
 
-def front_app(ctx) -> str:
-    m = re.search(r"mResumedActivity: \S+ \S+ (\S+)", shell(ctx, "dumpsys", "activity", "activities", check=False))
+def front_app(ctx, timeout: float = 120) -> str:
+    m = re.search(r"mResumedActivity: \S+ \S+ (\S+)",
+                  shell(ctx, "dumpsys", "activity", "activities", check=False, timeout=timeout))
     return m.group(1) if m else ""
 
 
@@ -148,12 +154,15 @@ def keep_magisk_in_front(ctx, every: float = 4.0):
     stop = threading.Event()
 
     def watch():
+        # Short timeouts, and a look at `stop` before acting: a slow adb call (a Wi-Fi blip) mustn't keep
+        # the thread past the prompt, or stop Cast and open Magisk after it (review of the run 7 fixes).
         while not stop.wait(every):
             try:
-                if front_app(ctx).startswith(CAST_PKG):
-                    shell(ctx, "am", "force-stop", CAST_PKG, check=False)
-                    shell(ctx, "monkey", "-p", MAGISK_PKG, "-c", "android.intent.category.LAUNCHER", "1",
-                          check=False)
+                if front_app(ctx, timeout=10).startswith(CAST_PKG) and not stop.is_set():
+                    shell(ctx, "am", "force-stop", CAST_PKG, check=False, timeout=10)
+                    if not stop.is_set():
+                        shell(ctx, "monkey", "-p", MAGISK_PKG, "-c", "android.intent.category.LAUNCHER", "1",
+                              check=False, timeout=10)
             except Exception:
                 pass
     t = threading.Thread(target=watch, daemon=True)
@@ -162,7 +171,7 @@ def keep_magisk_in_front(ctx, every: float = 4.0):
         yield
     finally:
         stop.set()
-        t.join(timeout=every + 30)
+        t.join(timeout=every + 25)     # its adb calls are at most 10 s each
 
 
 class RootStep(Step):
@@ -201,7 +210,10 @@ class RootStep(Step):
                         "Additional Setup, **tap OK**. Touch nothing else: the clock restarts by itself, and the tool "
                         "waits for it. If it doesn't ask (its setup was done on an earlier try), there's nothing to "
                         "tap. Close any popup offering to patch: that's done already.")
-        if not clock.wait_restarted(ctx, old, why="the clock to restart, after you tap OK", give_up=180):
+        # Cast's "Link Account" can cover Requires Additional Setup too (review of the run 7 fixes).
+        with keep_magisk_in_front(ctx):
+            restarted = clock.wait_restarted(ctx, old, why="the clock to restart, after you tap OK", give_up=180)
+        if not restarted:
             if choose(ctx.ui, "No restart yet. If Magisk didn't ask for extra setup, press Enter to carry on; if "
                               "you tapped OK, wait for it to restart first. Or type stop: ", "stop"):
                 raise RootFailed("Stopped before Magisk was set up. Run the same command again to carry on.")

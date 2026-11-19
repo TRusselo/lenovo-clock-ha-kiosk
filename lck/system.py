@@ -106,7 +106,7 @@ def ask_wifi_ready(ctx) -> bool:
 
 def ask_wifi(ctx):
     """The Wi-Fi name and password, for the clock's user data."""
-    from lck.userdata import UserdataFailed, check_wifi
+    from lck.userdata import UserdataFailed, check_psk, check_ssid
     ctx.ui.say("The clock needs a Wi-Fi network to come back on after the flash. The tool adds yours to its user "
                "data. The password is kept only in the work folder's images, like a backup's own, and never logged.")
     while True:
@@ -114,7 +114,7 @@ def ask_wifi(ctx):
         ssid = ctx.ui.ask("Wi-Fi name (as your phone shows it, 2.4 GHz if your router has two): ",
                           log_answer=False).strip()
         try:
-            check_wifi(ssid, "x" * 8)
+            check_ssid(ssid)
         except UserdataFailed as e:
             ctx.ui.say(str(e))
             continue
@@ -122,7 +122,7 @@ def ask_wifi(ctx):
             # Only the password again when it's the password that's wrong (e2e run 7 asked the name too).
             psk = ctx.ui.ask_secret("Wi-Fi password (not shown as you type): ")
             try:
-                check_wifi(ssid, psk)
+                check_psk(psk)
                 return ssid, psk
             except UserdataFailed as e:
                 ctx.ui.say(str(e))

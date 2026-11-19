@@ -15,7 +15,8 @@ import time
 from pathlib import Path
 
 from lck.downloads import fetch
-from lck.modes import BROM_PROMPT, HINT_AFTER, NOTHING_HINT, PRELOADER_HINT, Mode, UsbNoPermission, current
+from lck.modes import (BROM_PROMPT, HINT_AFTER, NOTHING_HINT, PRELOADER_HINT, STARTED_AFTER, Mode,
+                       UsbNoPermission, current)
 from lck.uvrun import uv_path, uv_python
 
 PACKAGES = ["pyusb", "pycryptodome", "pycryptodomex", "colorama", "pyserial", "keystone-engine",
@@ -95,19 +96,22 @@ def _ok(text: str, commands: list[str]) -> bool:
     return True
 
 
-def release_stale(ctx, sleep=time.sleep, message: str = STALE) -> None:
+def release_stale(ctx, sleep=time.sleep, message: str = STALE) -> bool:
     """A clock still in BROM or held by mtkclient's download agent from a stopped or failed session
-    (0e8d:2001) makes the next session read nothing. Only unplugging it frees it (e2e run 6)."""
+    (0e8d:2001) makes the next session read nothing. Only unplugging it frees it (e2e run 6).
+    True when it asked for the unplug."""
     try:
         mode = current(ctx)
     except Exception:
-        return
+        return False
     if mode in (Mode.DA, Mode.BROM, Mode.PRELOADER):
         ctx.ui.physical(message)
         with ctx.ui.busy("Waiting for the clock's power to be unplugged") as job:
             while current(ctx) != Mode.NONE:
                 sleep(0.5)
             job.done("The clock is unplugged")
+        return True
+    return False
 
 
 def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str = BROM_PROMPT,
@@ -126,13 +130,17 @@ def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str 
     for attempt in range(1, TRIES + 1):
         # The first try may follow a session that ended normally (restore reads, then writes): its
         # own words then (e2e run 7: "still held by the last try" read as a failure).
-        release_stale(ctx, sleep, held_message if attempt == 1 else STALE)
+        message = held_message if attempt == 1 else STALE
+        unplugged = release_stale(ctx, sleep, message)
+        # Its own words already said what this session is for: the plain steps then, not "BROM mode again,
+        # this time to write" a second time (review of the run 7 fixes).
+        steps = BROM_PROMPT if unplugged and message is not STALE else prompt
         log = cwd / "mtk-output.txt"
         proc = ctx.runner.spawn(args, out_file=log, cwd=cwd)
         try:
-            ctx.ui.physical(prompt)
+            ctx.ui.physical(steps)
             ctx.ui.status("waiting for BROM")
-            text = _follow(ctx, proc, log, title, sleep, timeout, commands, prompt, weights)
+            text = _follow(ctx, proc, log, title, sleep, timeout, commands, steps, weights)
         except MtkFailed:
             # The output so far tells why (e2e run 7: a USB pull was reported as "didn't reach BROM").
             try:
@@ -176,7 +184,8 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
             weights=None) -> str:
     start = time.monotonic()
     last = None
-    hinted = nothing_hinted = seen_brom = False
+    hinted = nothing_hinted = False
+    brom_at = None        # when BROM was last seen
     reprompts = 1
     guard: dict = {}
     while proc.poll() is None:
@@ -203,9 +212,14 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
             break
         waited = time.monotonic() - start
         if mode == Mode.BROM:
-            seen_brom = True
-        # Nothing on USB between BROM and the download agent is the handover, not a miss (e2e run 7).
-        if mode == Mode.NONE and not nothing_hinted and not seen_brom and waited > HINT_AFTER:
+            brom_at = time.monotonic()
+        # A short gap after BROM is the handover to the download agent, not a miss (e2e run 7); a long one
+        # means the buttons were let go and the clock started normally, which is what the hint is for.
+        if brom_at is None:
+            nothing_long = waited > HINT_AFTER
+        else:
+            nothing_long = time.monotonic() - brom_at >= STARTED_AFTER
+        if mode == Mode.NONE and not nothing_hinted and nothing_long:
             ctx.ui.say(NOTHING_HINT)
             nothing_hinted = True
         if waited > REPROMPT_AFTER * reprompts:

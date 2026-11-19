@@ -163,8 +163,16 @@ def wifi_networks(img: str) -> int:
 
 
 def check_wifi(ssid: str, psk: str) -> None:
+    check_ssid(ssid)
+    check_psk(psk)
+
+
+def check_ssid(ssid: str) -> None:
     if not 1 <= len(ssid.encode()) <= 32:
         raise UserdataFailed("A Wi-Fi name is 1 to 32 characters.")
+
+
+def check_psk(psk: str) -> None:
     if not 8 <= len(psk) <= 63:
         raise UserdataFailed("A WPA2 Wi-Fi password is 8 to 63 characters. Networks with no password, or WEP, "
                              "aren't supported by the tool: set the clock up with the Google Home app instead.")

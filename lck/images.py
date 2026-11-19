@@ -193,7 +193,8 @@ class UserdataStep(Step):
             if ctx.state.get("wifi_new"):
                 ssid, psk = ctx.state["wifi_new"]
                 userdata.add_wifi(str(img), ssid, psk)
-                ctx.ui.say(f"Added the Wi-Fi network {ssid} to the clock's user data.")
+                # On screen, not in the log: logs get pasted into issues (review of the run 7 fixes).
+                ctx.ui.say(f"Added the Wi-Fi network {ssid} to the clock's user data.", log=False)
             with open(img, "r+b") as f:
                 f.truncate(sparse.whole_blocks(length))
             r = ctx.runner.run(["e2fsck", "-fn", img], check=False, timeout=1800)

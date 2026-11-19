@@ -948,6 +948,178 @@ def test_a_rerun_reuses_magisks_patch(tmp_path, monkeypatch):
     out = tmp_path / "work" / "clock" / "images" / "boot-magisk.img"
     out.parent.mkdir(parents=True)
     out.write_bytes(b"ANDROID!patched")
-    out.with_name(out.name + ".from").write_text(f"{backup.sha256(boot)} {root.MAGISK_VERSION}")
+    apk = tmp_path / "magisk.apk"
+    apk.write_bytes(b"magisk")
+    monkeypatch.setattr(root, "fetch", lambda id_, ctx: apk)
+    out.with_name(out.name + ".from").write_text(root.made_from(boot, apk))
     monkeypatch.setattr(root, "patch_files", lambda ctx: pytest.fail("patched again"))
     assert root.patch(ctx_for(tmp_path), boot) == out
+
+
+# --- review of a0b8517 (e2e run 7 report) ----------------------------------
+
+def test_leaving_fastboot_during_the_flash_waits_again_at_once(tmp_path, monkeypatch):
+    # Review 1: nothing flashed and the clock gone: don't sit 300 s in "Flashing… 0 of 1".
+    monkeypatch.setattr(flash, "uv_path", lambda ctx: Path("uv"))
+    monkeypatch.setattr(flash, "fetch", lambda id_, ctx: Path("fbmulti.py"))
+    waits = []
+    monkeypatch.setattr(flash, "wait_for_mode", lambda mode, ctx, prompt: waits.append(mode))
+    first = FakeProc([True] * 50, 1, "", None)
+    runner = SpawnRunner([first, FakeProc([True], 0, "ALL DONE in 3 s", None)])
+    flash.fbmulti(ctx_for(tmp_path, runner=runner, detect=lambda: []), [(tmp_path / "b.img", "boot_a")],
+                  title="t", sleep=lambda s: None)
+    assert first.returncode == -9 and len(runner.spawned) == 2 and len(waits) == 2
+
+
+def test_the_typed_wifi_name_stays_out_of_the_log():
+    # Review 2: the answer was hidden, but "Added the Wi-Fi network <name>" logged it.
+    import inspect
+    from lck import images
+    src = inspect.getsource(images.UserdataStep.run)
+    line = next(l for l in src.splitlines() if "Added the Wi-Fi network" in l)
+    assert "log=False" in line
+
+
+def test_the_secret_filter_still_masks_a_value_after_colon_space():
+    # Review 3: "password: hunter2" was masked before the prose fix, and must still be.
+    from lck.log import redact
+    assert redact("password: hunter22") == "password: ***"
+    assert redact("api_token : abc123") == "api_token : ***"
+    assert redact("your address and token: http://x:2324") == "your address and token: http://x:2324"
+
+
+def _follow_with(tmp_path, monkeypatch, timeline):
+    """Run mtk._follow against (seconds, mode) steps, on a fake clock."""
+    now = [0.0]
+    monkeypatch.setattr(mtk.time, "monotonic", lambda: now[0])
+
+    def sleep(s):
+        now[0] += s
+    seq = list(timeline)
+
+    def detect():
+        while len(seq) > 1 and seq[1][0] <= now[0]:
+            seq.pop(0)
+        m = seq[0][1]
+        return [] if m == Mode.NONE else [m]
+    ui = FakeUI()
+    proc = FakeProc([True] * int(timeline[-1][0] * 4 + 4), 1, "", None)
+    c = ctx_for(tmp_path, runner=SpawnRunner([]), ui=ui, detect=detect)
+    try:
+        mtk._follow(c, proc, tmp_path / "out.txt", "t", sleep, 4 * 3600, ["rf a.bin"], "Hold", None)
+    except mtk.MtkFailed:
+        pass
+    return ui
+
+
+def test_brom_then_nothing_for_long_still_gets_the_hint(tmp_path, monkeypatch):
+    # Review 4: let go as BROM showed, the clock started Android: the hint is for exactly this.
+    ui = _follow_with(tmp_path, monkeypatch, [(0, Mode.NONE), (27, Mode.BROM), (28, Mode.NONE), (60, Mode.NONE)])
+    assert any("Nothing yet" in l for l in ui.lines)
+
+
+def test_the_short_gap_before_the_download_agent_gets_no_hint(tmp_path, monkeypatch):
+    ui = _follow_with(tmp_path, monkeypatch, [(0, Mode.NONE), (27, Mode.BROM), (28, Mode.NONE), (31, Mode.DA),
+                                               (32, Mode.NONE)])
+    assert not any("Nothing yet" in l for l in ui.lines)
+
+
+def test_cast_is_watched_while_waiting_for_magisks_ok(tmp_path, monkeypatch):
+    # Review 5: "Link Account" covered "Requires Additional Setup" with nothing to bring Magisk back.
+    import contextlib
+    from lck import root
+    watching = []
+
+    @contextlib.contextmanager
+    def watch(ctx, every=4.0):
+        watching.append(True)
+        yield
+        watching.pop()
+    seen = []
+    monkeypatch.setattr(root, "keep_magisk_in_front", watch)
+    monkeypatch.setattr(root, "open_magisk", lambda ctx: None)
+    monkeypatch.setattr(root, "settle", lambda ctx: None)
+    monkeypatch.setattr(root.clock, "boot_id", lambda ctx: "a")
+    monkeypatch.setattr(root.clock, "wait_restarted", lambda *a, **k: seen.append(bool(watching)) or True)
+    monkeypatch.setattr(root.clock, "wait_booted", lambda *a, **k: None)
+    monkeypatch.setattr(root.clock, "has_root", lambda ctx: True)
+    monkeypatch.setattr(root, "shell", lambda *a, **k: "")
+    root.RootStep()._first_run(ctx_for(tmp_path))
+    assert seen == [True]
+
+
+def test_passing_through_brom_on_the_way_to_fastboot_isnt_told_to_unplug(tmp_path):
+    # Review 6: only the download agent left over from a BROM job needs the unplug first.
+    modes = iter([[Mode.BROM], [Mode.BROM], [Mode.FASTBOOT]])
+    ui = FakeUI()
+    wait_for_mode(Mode.FASTBOOT, ctx_for(tmp_path, ui=ui, detect=lambda: next(modes)), prompt="Hold",
+                  sleep=lambda s: None)
+    assert not any("Unplug its round power plug first" in l for l in ui.lines)
+    modes = iter([[Mode.DA], [Mode.DA], [], [], [Mode.FASTBOOT]])
+    ui = FakeUI()
+    wait_for_mode(Mode.FASTBOOT, ctx_for(tmp_path, ui=ui, detect=lambda: next(modes)), prompt="Hold",
+                  sleep=lambda s: None)
+    assert any("Unplug its round power plug first" in l for l in ui.lines)
+
+
+def test_a_patch_from_another_magisk_isnt_reused(tmp_path, monkeypatch):
+    # Review 7: the stamp follows the Magisk file used, not a typed-in version.
+    from lck import root
+    boot = tmp_path / "boot-stock.img"
+    boot.write_bytes(b"ANDROID!stock")
+    apk = tmp_path / "magisk.apk"
+    apk.write_bytes(b"magisk one")
+    monkeypatch.setattr(root, "fetch", lambda id_, ctx: apk)
+    out = tmp_path / "work" / "clock" / "images" / "boot-magisk.img"
+    out.parent.mkdir(parents=True)
+    out.write_bytes(b"ANDROID!patched")
+    out.with_name(out.name + ".from").write_text(root.made_from(boot, apk))
+    assert root.patch(ctx_for(tmp_path), boot) == out           # same Magisk: reused
+    apk.write_bytes(b"magisk two")
+    monkeypatch.setattr(root, "patch_files", lambda ctx: (_ for _ in ()).throw(RuntimeError("patching")))
+    with pytest.raises(RuntimeError, match="patching"):
+        root.patch(ctx_for(tmp_path), boot)                      # another Magisk: patched again
+
+
+def test_the_cast_watcher_does_nothing_once_stopped(tmp_path, monkeypatch):
+    # Review 8: a slow adb call must not stop Cast or relaunch Magisk after the prompt ended.
+    import threading
+    from lck import root
+    calls, release = [], threading.Event()
+
+    def front(ctx, timeout=None):
+        release.wait(2)
+        return root.CAST_PKG + "/.Setup"
+    monkeypatch.setattr(root, "front_app", front)
+    monkeypatch.setattr(root, "shell", lambda ctx, *a, **k: calls.append(a) or "")
+    with root.keep_magisk_in_front(ctx_for(tmp_path), every=0.01):
+        import time as _t
+        _t.sleep(0.05)
+    release.set()
+    _t.sleep(0.1)
+    assert calls == []
+
+
+def test_the_wifi_name_and_password_are_checked_apart():
+    # Review 9: no fake password to check a name.
+    from lck import userdata
+    userdata.check_ssid("Home")
+    with pytest.raises(userdata.UserdataFailed):
+        userdata.check_ssid("")
+    with pytest.raises(userdata.UserdataFailed):
+        userdata.check_psk("short")
+
+
+def test_restores_second_session_shows_one_unplug_box(tmp_path, monkeypatch):
+    from lck.modes import BROM_AGAIN
+    # Review 10: NEXT_SESSION, then the plain BROM steps, not "BROM mode again, this time to write" again.
+    monkeypatch.setattr(mtk, "_python", lambda ctx: ["python"])
+    monkeypatch.setattr(mtk, "script", lambda ctx: Path("mtk.py"))
+    seq = iter([[Mode.DA], []] + [[]] * 20)
+    runner = SpawnRunner([FakeProc([], 0, "Wrote x.bin to sector 0", None)])
+    ui = FakeUI()
+    mtk.run_in_brom(ctx_for(tmp_path, runner=runner, ui=ui, detect=lambda: next(seq)), ["w boot_a x.bin"],
+                    cwd=tmp_path, title="t", prompt=BROM_AGAIN, held_message=mtk.NEXT_SESSION,
+                    sleep=lambda s: None)
+    boxes = [l for l in ui.lines if l.startswith("[physical]")]
+    assert sum("this time to write" in b for b in boxes) == 1

@@ -27,6 +27,7 @@ from lck.ui import choose
 from lck.uvrun import uv_path, uv_python
 
 RETRIES = 3    # times fastboot is asked for again when the clock left it before the flash started
+LEFT_AFTER = 3  # one-second looks with the clock out of fastboot, nothing written, before waiting again
 FLASH_SET = {"boot_a", "vendor_a", "vbmeta_a", "system_a", "oem_a", "userdata", "misc"}
 WIPE_WARNING = ("This clock was already unlocked before this run: it may be converted already, or put back "
                 "to stock with lck restore, which leaves it unlocked. Flashing replaces slot A and its user "
@@ -86,10 +87,21 @@ def fbmulti(ctx, pairs: list[tuple[Path, str]], *, title: str, sleep=time.sleep)
         proc = ctx.runner.spawn(args, out_file=log)
         try:
             with ctx.ui.busy(title) as job:
+                gone = 0
                 while proc.poll() is None:
                     done = _flashed(log)
                     job.note(f"{done} of {len(pairs)}", done, len(pairs))
+                    # Gone from fastboot before anything was written: wait again now, not after fbmulti.py's
+                    # own 300 s (review of the run 7 fixes). A few looks, so a USB blip isn't taken for it.
+                    gone = gone + 1 if done == 0 and _mode(ctx) not in (Mode.FASTBOOT, None) else 0
+                    if gone >= LEFT_AFTER:
+                        proc.kill()
+                        ctx.runner.finished(proc)
+                        break
                     sleep(1)
+                if gone >= LEFT_AFTER:
+                    job.pause("The clock left fastboot mode before anything was written")
+                    continue
                 text = ctx.runner.finished(proc)
                 if proc.returncode == 0 and "ALL DONE" in text:
                     return
@@ -108,6 +120,14 @@ def fbmulti(ctx, pairs: list[tuple[Path, str]], *, title: str, sleep=time.sleep)
             raise
     raise FlashFailed("The clock kept leaving fastboot mode before the flash could start. Nothing was written. "
                       "Unplug its power and run the same command again.")
+
+
+def _mode(ctx) -> Mode | None:
+    """The clock's mode, or None when USB can't be read just now."""
+    try:
+        return current(ctx)
+    except Exception:
+        return None
 
 
 def _flashed(log: Path) -> int:

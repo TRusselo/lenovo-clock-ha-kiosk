@@ -119,9 +119,10 @@ def wait_for_mode(target: Mode, ctx, *, prompt: str, timeout: float = 180,
     if mode == target:
         ui.say(f"The clock is already in {target.value} mode.")
         return
-    if mode in (Mode.BROM, Mode.DA, Mode.PRELOADER) and target == Mode.FASTBOOT:
-        # Still in BROM from a backup: unplug first, rather than the box and "wrong mode" at once
-        # (e2e run 7: the fastboot box twice).
+    if mode == Mode.DA and target == Mode.FASTBOOT:
+        # Still held by the download agent from a backup: unplug first, rather than the box and "wrong mode"
+        # at once (e2e run 7: the fastboot box twice). Plain BROM is left alone: it's on the way to fastboot,
+        # and someone already holding VOLUME UP mustn't be told to unplug (review of the run 7 fixes).
         ui.physical(f"The clock is still in {mode.value} mode from the last job. Unplug its round power plug "
                     "first.")
         with ui.busy("Waiting for the clock's power to be unplugged") as job:
