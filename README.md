@@ -142,8 +142,15 @@ More views and screenshots: [the dashboard's repository](https://github.com/TRus
 **Quick start:**
 1. Click the button above. It opens the dashboard in the Marketplace (Home Assistant 2026.11 and later) or HACS
    (older versions). Choose **Download**, then reload your browser.
-2. In Home Assistant, go to **Settings > Dashboards > Add dashboard** and pick **Kiosk Clock**. (If it isn't
-   offered, make an empty dashboard and set its raw configuration to `strategy:` / `type: custom:kiosk-clock`.)
+2. In Home Assistant, go to **Settings > Dashboards > Add dashboard** and pick **Kiosk Clock**. If it isn't
+   offered, make an empty dashboard, open **⋮ > Edit dashboard > ⋮ > Raw configuration editor**, and replace
+   everything with:
+
+   ```yaml
+   strategy:
+     type: custom:kiosk-clock
+   ```
+
 3. In Kiosk Satellite on the clock, pick the new dashboard.
 
 Options, installing by hand, and questions about the dashboard: [its own repository](https://github.com/TRusselo/lenovo-clock-dashboard).
