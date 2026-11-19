@@ -44,18 +44,22 @@ def test_this_systems_e2fsprogs_edits_a_user_data_image(tmp_path):
     if os.name == "nt":                       # Cygwin's mke2fs sits in the same package
         shutil.copy2(next((c.paths.cache / "cygwin-e2fsprogs").rglob("mke2fs.exe")),
                      Path(userdata.DEBUGFS).parent / "mke2fs.exe")
-    tree = tmp_path / "img" / "tree"
-    (tree / "system" / "users" / "0").mkdir(parents=True)
-    (tree / "system" / "users" / "0" / "settings_global.xml").write_text(
-        '<settings version="-1">\n<setting id="1" name="adb_enabled" value="0" package="android" />\n</settings>\n')
-    for d in ("property", "misc/adb", "misc/wifi"):
-        (tree / d).mkdir(parents=True)
-    img = tmp_path / "img" / "userdata test.img"          # a space in the name, as in real folders
+    folder = tmp_path / "img"
+    folder.mkdir()
+    img = folder / "userdata test.img"          # a space in the name, as in real folders
     with open(img, "wb") as f:
         f.truncate(16 << 20)
-    r = subprocess.run([_mke2fs(), "-F", "-t", "ext4", "-d", "tree", img.name], cwd=img.parent,
-                       capture_output=True, text=True, env=userdata.ENV)
+    r = subprocess.run([_mke2fs(), "-F", "-t", "ext4", img.name], cwd=folder, capture_output=True, text=True,
+                       env=userdata.ENV)
     assert r.returncode == 0, r.stdout + r.stderr
+    # The stock user data's shape, made with debugfs itself (mke2fs -d isn't reliable on Cygwin).
+    (folder / "settings_global.xml").write_text(
+        '<settings version="-1">\n<setting id="1" name="adb_enabled" value="0" package="android" />\n</settings>\n',
+        newline="\n")
+    userdata.dbg(str(img), ["mkdir system", "mkdir system/users", "mkdir system/users/0", "mkdir property",
+                            "mkdir misc", "mkdir misc/adb", "mkdir misc/wifi",
+                            "write settings_global.xml system/users/0/settings_global.xml"])
+    assert b"adb_enabled" in userdata.cat(str(img), "/system/users/0/settings_global.xml")
     pub = tmp_path / "img" / "adbkey.pub"
     pub.write_text("QAAAAfake-key-for-the-test user@host\n")
     userdata.inject(str(img), str(pub), runner=c.runner)

@@ -354,7 +354,7 @@ def test_one_bar_for_the_whole_restore(tmp_path):
     # Real mtkclient output from run 2's restore (\r between progress redraws).
     log.write_text("Done |\u2588---------| 6.2% Write: (0x200000/0x2000000),0.00 MB/s\r"
                    "Wrote parts/boot_a.bin to sector 134184 with sector count 65536.\n"
-                   "Progress: |\u2588\u2588---| 50.0% Write: (0x400000/0x2000000), 20.11 MB/s 01s left \r")
+                   "Progress: |\u2588\u2588---| 50.0% Write: (0x400000/0x2000000), 20.11 MB/s 01s left \r", encoding="utf-8")
     assert mtk.overall(log, [10, 10, 80]) == pytest.approx(15.0)
     log.write_text("Wrote a\nWrote b\nWrote c\n")
     assert mtk.overall(log, [10, 10, 80]) == pytest.approx(100.0)
@@ -596,10 +596,11 @@ def test_the_log_tail_is_only_this_run(tmp_path, capsys):
     import argparse
     (tmp_path / "logs").mkdir()
     (tmp_path / "logs" / "clock.log").write_text(
-        f"old restore line\n{cli.RUN_MARK} restore\nolder\n{cli.RUN_MARK} setup\nthis run's line\nSTOPPED x\n")
+        f"line from the restore\n{cli.RUN_MARK} restore\nline from the run before\n{cli.RUN_MARK} setup\n"
+        "this run's line\nSTOPPED x\n")
     cli._print_log_tail(argparse.Namespace(name="clock", workdir=tmp_path))
     err = capsys.readouterr().err
-    assert "this run's line" in err and "older" not in err and "old restore" not in err
+    assert "this run's line" in err and "line from the run before" not in err and "line from the restore" not in err
 
 
 def test_su_gets_the_whole_command_as_one_argument(tmp_path):
@@ -739,7 +740,7 @@ def test_no_saved_wifi_asks_before_anything_is_written(tmp_path, monkeypatch):
     monkeypatch.setattr(images, "backup_dir", lambda ctx: folder)
     monkeypatch.setattr(userdata, "wifi_networks", lambda img: 0)
     ui = FakeUI(["Home", "secret-pass"])
-    c = ctx_for(tmp_path, ui=ui, runner=FakeRunner())
+    c = ctx_for(tmp_path, ui=ui, runner=FakeRunner(), e2fs=True)   # no real e2fsprogs needed
     images.ensure_wifi(c)
     assert c.state["wifi_new"] == ("Home", "secret-pass")
     assert not any("secret-pass" in l for l in ui.lines)        # the password is never echoed back
