@@ -1,5 +1,7 @@
 # lenovo-clock-ha-kiosk
 
+<img width="500" alt="A Lenovo Smart Clock showing its Home Assistant dashboard: the time, the date, the weather, and buttons for the room's lights, its music player and the screensaver" src="assets/images/clock-with-dashboard.jpg" />
+
 **Turn a stock Lenovo Smart Clock (gen 1) into a degoogled Home Assistant kiosk: your dashboard on its 4" screen,
 with Music Assistant, and root.**
 
@@ -86,6 +88,8 @@ You don't need a GitHub account, and you don't need to know any code. You'll typ
 its screen, and when to press Enter. That's it. If it stops for any reason, type the same command again and it
 carries on where it left off.
 
+<img width="600" alt="The setup screen: every step listed, the current one highlighted, and a yellow box saying what to do on the clock" src="assets/images/setup-screen.png" />
+
 Yellow means it's your turn: something to do on the clock, or a question to answer. Red only shows when something
 went wrong.
 
@@ -122,6 +126,25 @@ Say how far it got, and copy the last few lines the tool printed.
 Run it from source with your own Python 3.10+: [docs/PYTHON.md](docs/PYTHON.md). Do every step by hand, or point an AI agent at it: [devices/cube/README.md](devices/cube/README.md) has each step
 with the check that proves it worked (agents: start with [AGENTS.md](AGENTS.md)). What was learned about the clock,
 observed versus guessed: [docs/findings/NOTES.md](docs/findings/NOTES.md).
+
+## Extra: a dashboard made for the clock
+
+[Lenovo Clock Dashboard](https://github.com/TRusselo/lenovo-clock-dashboard) is a Home Assistant dashboard sized for the clock's 4" screen: a big clock with
+the next alarm and weather, your rooms, the clock's music player, and screen controls. It finds the clock by
+itself and uses built-in cards only. It's optional: the clock shows any dashboard you pick.
+
+<img width="400" alt="The dashboard's Home view on the clock: the time, the date, the weather, two room lights, the clock's player and the screensaver" src="assets/images/dashboard-home.jpg" />
+
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=TRusselo&repository=lenovo-clock-dashboard&category=plugin)
+
+**Quick start:**
+1. Click the button above. It opens the dashboard in the Marketplace (Home Assistant 2026.11 and later) or HACS
+   (older versions). Choose **Download**, then reload your browser.
+2. In Home Assistant, go to **Settings > Dashboards > Add dashboard** and pick **Kiosk Clock**. (If it isn't
+   offered, make an empty dashboard and set its raw configuration to `strategy:` / `type: custom:kiosk-clock`.)
+3. In Kiosk Satellite on the clock, pick the new dashboard.
+
+Options, installing by hand, and questions about the dashboard: [its own repository](https://github.com/TRusselo/lenovo-clock-dashboard).
 
 ## How it works
 

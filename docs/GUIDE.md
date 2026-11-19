@@ -29,6 +29,8 @@ that's normal.
 
 ## What you'll see
 
+<img width="600" alt="The setup screen during the backup" src="../assets/images/setup-screen.png" />
+
 One screen that redraws as setup goes: a bar, every step with a ✓ when it's done, and the current one
 highlighted. Under it, the job in progress counts up, such as "37%" for the backup.
 
