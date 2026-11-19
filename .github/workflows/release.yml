@@ -6,6 +6,9 @@ name: release
 on:
   push:
     tags: ["v*"]
+    # Test builds: a push to this branch builds the three zips as run artifacts; nothing is published
+    # (the release step only runs for a tag).
+    branches: [windows-mac]
   workflow_dispatch:
 
 permissions:
