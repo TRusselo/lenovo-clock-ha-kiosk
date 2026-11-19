@@ -133,9 +133,9 @@ observed versus guessed: [docs/findings/NOTES.md](docs/findings/NOTES.md).
 the next alarm and weather, your rooms, the clock's music player, and screen controls. It finds the clock by
 itself and uses built-in cards only. It's optional: the clock shows any dashboard you pick.
 
-| Home | Rooms | Media | Screen |
-|---|---|---|---|
-| <img width="200" alt="The Home view: the time, the date, the weather, the room's light and fan, the clock's player and the screensaver" src="assets/images/dashboard-home.jpg" /> | <img width="200" alt="The Rooms view: one card per room, grouped by floor" src="assets/images/dashboard-rooms.jpg" /> | <img width="200" alt="The Media view: the clock's player and a volume slider" src="assets/images/dashboard-media.jpg" /> | <img width="200" alt="The Screen view: brightness, auto brightness, keep screen on, screensaver and reload" src="assets/images/dashboard-screen.jpg" /> |
+<img width="400" alt="The dashboard's Home view on the clock: the time, the date, the weather, the room's light and fan, the clock's player and the screensaver" src="assets/images/dashboard-home.jpg" />
+
+More views and screenshots: [the dashboard's repository](https://github.com/TRusselo/lenovo-clock-dashboard).
 
 [![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=TRusselo&repository=lenovo-clock-dashboard&category=plugin)
 
