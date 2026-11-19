@@ -32,7 +32,7 @@ Both the tool's own flashing and Google's `fastboot.exe` (the unlock) use that o
 
 ## macOS
 
-No drivers. Install libusb and e2fsprogs with Homebrew: `brew install libusb e2fsprogs`.
+No drivers. Install libusb with Homebrew: `brew install libusb`.
 
 ## Linux
 

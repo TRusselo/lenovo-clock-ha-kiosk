@@ -1,8 +1,8 @@
 name: release
 
 # On a version tag: build the standalone program for Windows, macOS and Linux and attach the zips to a
-# GitHub release (a draft, to check before publishing). mtkclient and Cygwin's e2fsprogs are never
-# bundled; they're downloaded at run time.
+# GitHub release (a draft, to check before publishing). e2fsprogs is bundled (with its licence and source);
+# mtkclient, platform-tools and the rest are downloaded at run time, never bundled.
 on:
   push:
     tags: ["v*"]
@@ -35,13 +35,22 @@ jobs:
       - run: python -m pip install -r requirements.txt pytest pyinstaller
       - run: python -m pytest -q
       - run: pyinstaller --noconfirm lck.spec
+      # e2fsprogs in the zip, so nobody installs it: built from the pinned upstream source on Linux and macOS,
+      # Cygwin's build on Windows. Licences and source addresses go with it.
+      - name: Bundle e2fsprogs (Linux, macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: scripts/build-e2fsprogs.sh dist/lck/e2fsprogs
+      - name: Bundle e2fsprogs (Windows)
+        if: runner.os == 'Windows'
+        run: python -c "from lck.e2fs import bundle_windows; bundle_windows('dist/lck/e2fsprogs')"
       - name: Smoke test
         shell: bash
         run: |
           ./dist/lck/lck --version
           ./dist/lck/lck selfcheck
           ./dist/lck/lck setup --dry-run --workdir "$RUNNER_TEMP/lck-smoke"
-          if find dist/lck -iname 'mtk.py' -o -iname 'cygwin1.dll' | grep -q .; then echo "mtkclient and Cygwin must not be bundled"; exit 1; fi
+          if find dist/lck -iname 'mtk.py' | grep -q .; then echo "mtkclient must not be bundled"; exit 1; fi
       - name: Zip
         shell: bash
         run: |
@@ -70,6 +79,10 @@ jobs:
         with:
           path: out
           merge-multiple: true
+      - name: e2fsprogs source (GPL-2.0), for the debugfs and e2fsck in the zips
+        run: |
+          curl -sSfL -o out/e2fsprogs-1.47.4.tar.xz https://mirrors.edge.kernel.org/pub/linux/kernel/people/tytso/e2fsprogs/v1.47.4/e2fsprogs-1.47.4.tar.xz
+          echo "fd5bf388cbdbe006a3d3b318d983b2948382440acc85a87f1e7d108653e8db0b  out/e2fsprogs-1.47.4.tar.xz" | sha256sum -c -
       - name: Checksums
         run: cd out && sha256sum * > SHA256SUMS && cat SHA256SUMS
       - uses: softprops/action-gh-release@v2

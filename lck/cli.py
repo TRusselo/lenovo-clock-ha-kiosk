@@ -82,6 +82,13 @@ def _selfcheck(args) -> int:
         pieces = sparse.write_pieces(str(raw), str(Path(tmp) / "piece"), 1 << 20)
         assert pieces and sparse.declared_size(open(pieces[0], "rb").read(28)) == raw.stat().st_size // 4096 * 4096
     assert _usb_backend() is not None, "no libusb backend"
+    if getattr(sys, "frozen", False):
+        from lck import e2fs, userdata
+        import subprocess
+        assert e2fs.bundled() is not None, "no bundled e2fsprogs"
+        e2fs.locate(None)
+        r = subprocess.run([userdata.DEBUGFS, "-V"], capture_output=True, text=True, env=userdata.ENV)
+        assert "debugfs" in (r.stdout + r.stderr), "bundled debugfs doesn't run: " + r.stdout + r.stderr
     print("selfcheck ok")
     return 0
 

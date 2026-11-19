@@ -89,8 +89,8 @@ carries on where it left off.
 Yellow means it's your turn: something to do on the clock, or a question to answer. Red only shows when something
 went wrong.
 
-Each system has a one-time extra step: USB drivers on Windows, Homebrew's libusb and e2fsprogs on a Mac, a USB
-permission and e2fsprogs on Linux. The full guides walk you through it:
+Each system has a one-time extra step: USB drivers on Windows, Homebrew's libusb on a Mac, a USB permission on
+Linux. Everything else comes in the zip. The full guides walk you through it:
 [Windows](docs/WINDOWS.md) · [Mac](docs/MACOS.md) · [Linux](docs/LINUX.md). Every page, in the order you'll need
 them: [the guide](docs/GUIDE.md).
 

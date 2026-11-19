@@ -24,12 +24,8 @@ in a few lines.
   thing the tool asks is whether it is: type YES, or NO to type your Wi-Fi name and password into the tool later.
   After the conversion the tool reaches the clock only over Wi-Fi.
 - About **20 GB free**.
-- **Homebrew**, for two small tools. Install [Homebrew](https://brew.sh), then run:
-  ```bash
-  brew install libusb e2fsprogs
-  ```
-  libusb is for USB; e2fsprogs (`debugfs`, `e2fsck`) edits the clock's user data. The tool stops and says so if
-  either is missing. No drivers are needed on a Mac.
+- **libusb**, for USB. Install [Homebrew](https://brew.sh), then run `brew install libusb`. No drivers are
+  needed on a Mac. (The program brings everything else, e2fsprogs included.)
 
 ## 2. Download and unzip
 

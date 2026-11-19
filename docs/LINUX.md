@@ -17,24 +17,9 @@ in a few lines.
   After the conversion the tool reaches the clock only over Wi-Fi.
 - About **20 GB free**.
 
-## 2. Install e2fsprogs (once)
+The program brings everything else it needs, e2fsprogs included.
 
-The tool edits the clock's user data with e2fsprogs (`debugfs`, `e2fsck`). Most distributions have it already;
-if not, copy the line for yours (it asks for your password):
-
-```bash
-sudo apt install e2fsprogs libusb-1.0-0     # Debian, Ubuntu, Mint
-```
-
-```bash
-sudo pacman -S --needed e2fsprogs libusb   # Arch, CachyOS, Manjaro
-```
-
-```bash
-sudo dnf install e2fsprogs libusb1         # Fedora
-```
-
-## 3. Download and unzip
+## 2. Download and unzip
 
 1. Download **[lck-linux-x86_64.zip](https://github.com/TRusselo/lenovo-clock-ha-kiosk/releases/latest/download/lck-linux-x86_64.zip)**. That link always gets the newest version.
 2. Unzip it into a folder of its own: right-click it and choose **Extract Here**, or run
@@ -44,7 +29,7 @@ The folder holds a folder called `lck` (the program) and these instructions. You
 are saved in this folder too. Open a terminal in it: right-click inside the folder and choose **Open Terminal
 Here**.
 
-## 4. Allow USB access (once)
+## 3. Allow USB access (once)
 
 Linux needs a rule that lets you use the clock over USB without root. Copy these lines into the terminal:
 
@@ -56,7 +41,7 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 (From source, the rule is at `assets/linux/51-lck.rules`.) It covers the clock's BROM, preloader and fastboot
 modes. If the tool ever says this account isn't allowed to use the clock, this step is the fix.
 
-## 5. Run it
+## 4. Run it
 
 Plug the USB cable into the clock and this computer. Leave the clock running for now.
 
@@ -64,7 +49,7 @@ Plug the USB cable into the clock and this computer. Leave the clock running for
 ./lck/lck setup
 ```
 
-## 6. Follow the prompts
+## 5. Follow the prompts
 
 - When it says **On the clock** (or **DO THIS ON THE CLOCK**), it tells you which buttons to hold: unplug the
   clock's round power plug, hold the button, plug the power back in, and keep holding as long as it says. The
@@ -78,7 +63,7 @@ Plug the USB cable into the clock and this computer. Leave the clock running for
   it asks first).
 - If it stops for any reason, run the same command again. It carries on where it left off.
 
-## 7. Keep your backup
+## 6. Keep your backup
 
 At the end the tool names your backup file, in the `backup` folder. Copy it somewhere safe, off this computer if
 you can, and keep it private: it holds the clock's own keys and its Wi-Fi details, and it's the only way back to

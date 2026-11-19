@@ -37,7 +37,7 @@ Windows needs two drivers to talk to the clock over USB. Follow the **Windows** 
 - **UsbDk**, for BROM mode (the backup and restore);
 - **Google's USB driver**, attached to the clock in fastboot mode (unlocking and flashing).
 
-The tool also downloads the Windows build of e2fsprogs (`debugfs`, `e2fsck`) that it needs, by itself.
+Everything else the tool needs comes with it, e2fsprogs included.
 
 ## 4. Open a command window in the folder
 

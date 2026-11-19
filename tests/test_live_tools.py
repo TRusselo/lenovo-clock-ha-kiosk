@@ -56,10 +56,18 @@ def test_this_systems_e2fsprogs_edits_a_user_data_image(tmp_path):
     (folder / "settings_global.xml").write_text(
         '<settings version="-1">\n<setting id="1" name="adb_enabled" value="0" package="android" />\n</settings>\n',
         newline="\n")
-    userdata.dbg(str(img), ["mkdir system", "mkdir system/users", "mkdir system/users/0", "mkdir property",
-                            "mkdir misc", "mkdir misc/adb", "mkdir misc/wifi",
-                            "write settings_global.xml system/users/0/settings_global.xml"])
-    assert b"adb_enabled" in userdata.cat(str(img), "/system/users/0/settings_global.xml")
+    out = userdata.dbg(str(img), ["mkdir system", "mkdir system/users", "mkdir system/users/0", "mkdir property",
+                                  "mkdir misc", "mkdir misc/adb", "mkdir misc/wifi",
+                                  "write settings_global.xml system/users/0/settings_global.xml"])
+    got = userdata.cat(str(img), "/system/users/0/settings_global.xml")
+    if b"adb_enabled" not in got:
+        diag = [out]
+        for req in ("ls -l /", "ls -l /system/users/0", "stat /system/users/0/settings_global.xml"):
+            r = userdata._run(str(img), ["-R", req], text=True)
+            diag.append(f"$ {req}\n{r.stdout}\n{r.stderr}")
+        raw = userdata._run(str(img), ["-R", "cat /system/users/0/settings_global.xml"])
+        diag.append(f"cat: rc={raw.returncode} out={raw.stdout[:200]!r} err={raw.stderr[:300]!r}")
+        pytest.fail("debugfs didn't write or read back the file:\n" + "\n".join(diag))
     pub = tmp_path / "img" / "adbkey.pub"
     pub.write_text("QAAAAfake-key-for-the-test user@host\n")
     userdata.inject(str(img), str(pub), runner=c.runner)
