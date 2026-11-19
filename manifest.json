@@ -134,7 +134,12 @@
       "size": 783804,
       "unpack": "tar.xz",
       "platform": "windows",
-      "note": "Cygwin's e2fsprogs (GPL-2.0) and the DLLs it loads (Cygwin: LGPL-3.0), for debugfs and e2fsck on Windows. Downloaded, never bundled."
+      "note": "Cygwin's e2fsprogs (GPL-2.0) and the DLLs it loads (Cygwin: LGPL-3.0), for debugfs and e2fsck on Windows. Downloaded, never bundled.",
+      "mirrors": [
+        "https://cygwin.mirror.constant.com/x86_64/release/e2fsprogs/e2fsprogs-1.44.5-1.tar.xz",
+        "https://mirror.clarkson.edu/cygwin/x86_64/release/e2fsprogs/e2fsprogs-1.44.5-1.tar.xz",
+        "https://ftp.fau.de/cygwin/x86_64/release/e2fsprogs/e2fsprogs-1.44.5-1.tar.xz"
+      ]
     },
     {
       "id": "cygwin-runtime",
@@ -142,7 +147,12 @@
       "sha256": "b5115799f46d4b10864aaff7a8a1b5e3e7b1bce03727c774f94d678c8dd69275",
       "size": 1621132,
       "unpack": "tar.xz",
-      "platform": "windows"
+      "platform": "windows",
+      "mirrors": [
+        "https://cygwin.mirror.constant.com/x86_64/release/cygwin/cygwin-3.6.12-1-x86_64.tar.xz",
+        "https://mirror.clarkson.edu/cygwin/x86_64/release/cygwin/cygwin-3.6.12-1-x86_64.tar.xz",
+        "https://ftp.fau.de/cygwin/x86_64/release/cygwin/cygwin-3.6.12-1-x86_64.tar.xz"
+      ]
     },
     {
       "id": "cygwin-libuuid1",
@@ -150,7 +160,12 @@
       "sha256": "8f6a8147388f37fba51f4d27b88d5d1ec97b09b2767309a27222d8b7361e10c2",
       "size": 12532,
       "unpack": "tar.xz",
-      "platform": "windows"
+      "platform": "windows",
+      "mirrors": [
+        "https://cygwin.mirror.constant.com/x86_64/release/util-linux/libuuid1/libuuid1-2.40.2-2.tar.xz",
+        "https://mirror.clarkson.edu/cygwin/x86_64/release/util-linux/libuuid1/libuuid1-2.40.2-2.tar.xz",
+        "https://ftp.fau.de/cygwin/x86_64/release/util-linux/libuuid1/libuuid1-2.40.2-2.tar.xz"
+      ]
     },
     {
       "id": "cygwin-libintl8",
@@ -158,7 +173,12 @@
       "sha256": "a6d684c0a638b0cd8bdcb142c24c056722dd06ba7b217a584a2181ee338c3caa",
       "size": 60324,
       "unpack": "tar.xz",
-      "platform": "windows"
+      "platform": "windows",
+      "mirrors": [
+        "https://cygwin.mirror.constant.com/x86_64/release/gettext/libintl8/libintl8-0.26-1-x86_64.tar.xz",
+        "https://mirror.clarkson.edu/cygwin/x86_64/release/gettext/libintl8/libintl8-0.26-1-x86_64.tar.xz",
+        "https://ftp.fau.de/cygwin/x86_64/release/gettext/libintl8/libintl8-0.26-1-x86_64.tar.xz"
+      ]
     },
     {
       "id": "cygwin-libiconv2",
@@ -166,7 +186,12 @@
       "sha256": "c424218c7ef7d82a3481d5aa7f1f1dda8364524fb86b687871184647ec59fcbf",
       "size": 555664,
       "unpack": "tar.xz",
-      "platform": "windows"
+      "platform": "windows",
+      "mirrors": [
+        "https://cygwin.mirror.constant.com/x86_64/release/libiconv/libiconv2/libiconv2-1.19-2-x86_64.tar.xz",
+        "https://mirror.clarkson.edu/cygwin/x86_64/release/libiconv/libiconv2/libiconv2-1.19-2-x86_64.tar.xz",
+        "https://ftp.fau.de/cygwin/x86_64/release/libiconv/libiconv2/libiconv2-1.19-2-x86_64.tar.xz"
+      ]
     },
     {
       "id": "cygwin-libgcc1",
@@ -174,7 +199,12 @@
       "sha256": "81df68770dd59e1e451d6bce1ba75c020339ce05cf262c6ea5e76aea233ef1f0",
       "size": 59166,
       "unpack": "tar.zst",
-      "platform": "windows"
+      "platform": "windows",
+      "mirrors": [
+        "https://cygwin.mirror.constant.com/x86_64/release/gcc/libgcc1/libgcc1-14.4.0-1-x86_64.tar.zst",
+        "https://mirror.clarkson.edu/cygwin/x86_64/release/gcc/libgcc1/libgcc1-14.4.0-1-x86_64.tar.zst",
+        "https://ftp.fau.de/cygwin/x86_64/release/gcc/libgcc1/libgcc1-14.4.0-1-x86_64.tar.zst"
+      ]
     },
     {
       "id": "cygwin-libss2",
@@ -182,7 +212,12 @@
       "sha256": "b54b737b132a0d7a43b54dc1aee2ce4463b0911d1170b5d20c87408c98758ea3",
       "size": 8132,
       "unpack": "tar.xz",
-      "platform": "windows"
+      "platform": "windows",
+      "mirrors": [
+        "https://cygwin.mirror.constant.com/x86_64/release/e2fsprogs/libss2/libss2-1.44.5-1.tar.xz",
+        "https://mirror.clarkson.edu/cygwin/x86_64/release/e2fsprogs/libss2/libss2-1.44.5-1.tar.xz",
+        "https://ftp.fau.de/cygwin/x86_64/release/e2fsprogs/libss2/libss2-1.44.5-1.tar.xz"
+      ]
     },
     {
       "id": "cygwin-libcom-err2",
@@ -190,7 +225,12 @@
       "sha256": "ce3d6826165e61142ba2ca45318e94bfb345a814983a614f7b0b452affe80817",
       "size": 4132,
       "unpack": "tar.xz",
-      "platform": "windows"
+      "platform": "windows",
+      "mirrors": [
+        "https://cygwin.mirror.constant.com/x86_64/release/e2fsprogs/libcom_err2/libcom_err2-1.44.5-1.tar.xz",
+        "https://mirror.clarkson.edu/cygwin/x86_64/release/e2fsprogs/libcom_err2/libcom_err2-1.44.5-1.tar.xz",
+        "https://ftp.fau.de/cygwin/x86_64/release/e2fsprogs/libcom_err2/libcom_err2-1.44.5-1.tar.xz"
+      ]
     },
     {
       "id": "cygwin-libext2fs2",
@@ -198,7 +238,12 @@
       "sha256": "2ba5f23be47a9b79ac36140035487fb8e4866f379f4a291e49b240655e811a53",
       "size": 126164,
       "unpack": "tar.xz",
-      "platform": "windows"
+      "platform": "windows",
+      "mirrors": [
+        "https://cygwin.mirror.constant.com/x86_64/release/e2fsprogs/libext2fs2/libext2fs2-1.44.5-1.tar.xz",
+        "https://mirror.clarkson.edu/cygwin/x86_64/release/e2fsprogs/libext2fs2/libext2fs2-1.44.5-1.tar.xz",
+        "https://ftp.fau.de/cygwin/x86_64/release/e2fsprogs/libext2fs2/libext2fs2-1.44.5-1.tar.xz"
+      ]
     },
     {
       "id": "cygwin-libe2p2",
@@ -206,7 +251,12 @@
       "sha256": "8919f779cf2600fd2b490e1460f8d3f7e84da5c1d47c850d4ea183603038e5ab",
       "size": 10024,
       "unpack": "tar.xz",
-      "platform": "windows"
+      "platform": "windows",
+      "mirrors": [
+        "https://cygwin.mirror.constant.com/x86_64/release/e2fsprogs/libe2p2/libe2p2-1.44.5-1.tar.xz",
+        "https://mirror.clarkson.edu/cygwin/x86_64/release/e2fsprogs/libe2p2/libe2p2-1.44.5-1.tar.xz",
+        "https://ftp.fau.de/cygwin/x86_64/release/e2fsprogs/libe2p2/libe2p2-1.44.5-1.tar.xz"
+      ]
     },
     {
       "id": "cygwin-libblkid1",
@@ -214,7 +264,12 @@
       "sha256": "8f927aeb52a54ad3cf3d1acbbe0a3a691bf4fd94e781e37d0c529f9989ec7270",
       "size": 120936,
       "unpack": "tar.xz",
-      "platform": "windows"
+      "platform": "windows",
+      "mirrors": [
+        "https://cygwin.mirror.constant.com/x86_64/release/util-linux/libblkid1/libblkid1-2.40.2-2.tar.xz",
+        "https://mirror.clarkson.edu/cygwin/x86_64/release/util-linux/libblkid1/libblkid1-2.40.2-2.tar.xz",
+        "https://ftp.fau.de/cygwin/x86_64/release/util-linux/libblkid1/libblkid1-2.40.2-2.tar.xz"
+      ]
     }
   ]
 }

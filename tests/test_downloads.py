@@ -222,3 +222,42 @@ def test_tar_paths_outside_the_folder_are_refused_without_extract_filters(tmp_pa
     with pytest.raises(ValueError, match="outside"):
         downloads._unpack("tar.gz", archive, tmp_path / "out")
     assert not (tmp_path / "outside").exists()
+
+
+def _dead_url():
+    import socket
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()                      # nothing listens here: connection refused
+    return f"http://127.0.0.1:{port}"
+
+
+def test_falls_back_to_a_mirror_when_the_main_host_is_down(tmp_path, server):
+    srv, url = server
+    sha, size = make_zip(srv / "m.zip", {"f": "data"})
+    manifest = {"x": {"id": "x", "url": f"{_dead_url()}/m.zip", "mirrors": [f"{url}/m.zip"],
+                      "sha256": sha, "size": size, "unpack": None, "platform": None}}
+    c = ctx_for(tmp_path / "work", manifest)
+    out = fetch("x", c)
+    assert out.name == "m.zip" and out.read_bytes() == (srv / "m.zip").read_bytes()
+
+
+def test_all_hosts_down_raises_naming_them(tmp_path):
+    dead = _dead_url()
+    manifest = {"x": {"id": "x", "url": f"{dead}/m.zip", "mirrors": [f"{dead}/m2.zip"],
+                      "sha256": "0" * 64, "size": 10, "unpack": None, "platform": None}}
+    c = ctx_for(tmp_path / "work", manifest)
+    with pytest.raises(downloads.DownloadFailed) as e:
+        fetch("x", c)
+    assert "127.0.0.1" in str(e.value)
+
+
+def test_cygwin_entries_have_mirrors():
+    m = load_manifest()
+    cyg = [e for e in m.values() if "/cygwin/" in e["url"]]
+    assert cyg, "expected Cygwin entries"
+    for e in cyg:
+        assert len(e.get("mirrors", [])) >= 2, e["id"]
+        for u in e["mirrors"]:
+            assert u.rsplit("/", 1)[-1] == e["url"].rsplit("/", 1)[-1]
