@@ -46,11 +46,24 @@ highlighted. Under it, the job in progress counts up, such as "37%" for the back
 
 New to this? [Words you'll see](../README.md#words-youll-see) explains the terms.
 
+### The USB cable
+
+<img width="300" alt="A USB A-to-A cable: a full-size USB-A plug at both ends" src="../assets/images/usb-a-to-a-cable.png" />
+
+You need a **USB A-to-A cable**: a full-size USB-A plug at both ends, wired straight through. A "data transfer"
+or "bridge" cable, with a box or chip in the middle, won't work.
+
+- **USB 2 or USB 3** both work. The clock uses only the USB 2 wires for data.
+- **Bonus, not covered here:** on the clock, the pins a USB 3 plug adds are wired to a low-voltage serial console
+  (UART: 1.8 V, 921600 baud in [untocodes' notes](https://github.com/untocodes/lenovo-cube-hacking)). Cut open a
+  USB 3 cable, peel out those extra wires, and they can go to a matching UART adapter. Check the voltage before
+  you connect anything: a common 3.3 V adapter can damage the clock.
+
 ### Plugging in
 
-The clock has two sockets on its back: the round barrel plug for power, and a full-size USB-A port. The USB
-cable is A-to-A, and has to be straight-through: a "data transfer" cable with a chip in the middle won't work.
-The clock runs on its barrel plug; the USB cable alone doesn't start it.
+The clock has two sockets on its back: the round barrel plug for power, and a full-size USB-A port. One end of the
+cable goes there, the other into the computer. The clock runs on its barrel plug; the USB cable alone doesn't
+start it.
 
 ## During setup
 

@@ -47,8 +47,10 @@ The tool checks the model over Wi-Fi before it changes anything there, and refus
 
 ## What you need
 
-- The clock, its round barrel-plug power supply, and a **USB A-to-A** cable (straight-through, no chip in the
-  middle) for the USB port on its back
+- The clock, and its round barrel-plug power supply: the clock runs on that, not on USB
+- A **USB A-to-A cable**: a plug like the computer end of a normal USB cable at *both* ends, wired straight
+  through, with no chip in the middle (not a "data transfer" or "bridge" cable). USB 2 or USB 3 both work
+  ([what it looks like](docs/GUIDE.md#the-usb-cable))
 - A **Linux** computer with about 20 GB free (Windows and macOS aren't supported yet)
 - Your Wi-Fi: the clock booted and connected to it (set it up with the Google Home app), or your Wi-Fi name
   and password to type into the tool. The first thing it asks is which

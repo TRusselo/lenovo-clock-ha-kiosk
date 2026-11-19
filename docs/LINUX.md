@@ -9,7 +9,8 @@ in a few lines.
 
 - A **Lenovo Smart Clock, gen 1**: the label underneath says **CD-24501F**. Other models aren't supported.
 - Its **round barrel-plug power supply**. The clock runs on that, not on USB.
-- A **USB A-to-A cable**, straight-through (no chip in the middle). It goes into the USB port on the clock's back.
+- A **USB A-to-A cable**: a full-size USB-A plug at both ends, straight through, no chip in the middle. USB 2 or
+  USB 3 both work ([what it looks like](GUIDE.md#the-usb-cable)). It goes into the USB port on the clock's back.
 - The clock **booted and connected to your Wi-Fi** (set it up with the Google Home app if it isn't). The first
   thing the tool asks is whether it is: type YES, or NO to type your Wi-Fi name and password into the tool later.
   After the conversion the tool reaches the clock only over Wi-Fi.

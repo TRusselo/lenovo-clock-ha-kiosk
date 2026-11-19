@@ -14,7 +14,9 @@ rather do it by hand, or if you're an AI agent following along.
   [platform-tools](https://developer.android.com/tools/releases/platform-tools). Third-party tools are pinned in
   [`manifest.json`](../../manifest.json).
 - **Power:** the clock runs on its round barrel plug, not USB. With USB alone the chip stays off.
-- **Cable:** USB **A-to-A**, straight-through (no chip in the middle), into the clock's USB port.
+- **Cable:** USB **A-to-A**, straight-through (no chip in the middle), into the clock's USB port. USB 2 or 3; the
+  clock uses the USB 2 data pins. Its USB 3 pins carry a low-voltage UART instead (see
+  [the guide](../../docs/GUIDE.md#the-usb-cable)).
 - **Modes.** The screen stays **dark** in all of them. Unplug the barrel power, hold the button(s), plug the power
   in. Find the mode from the USB device list (`lsusb`):
   - **fastboot:** hold **VOLUME UP**, keep holding about 10 seconds (it passes through BROM at 3 to 5). `0bb4:0c01`.

@@ -8,6 +8,8 @@ Evidence labels: **Observed** (read on a real clock or its backup), **Reported**
 - MediaTek MT8167S (LK reports MT8167A), 4× Cortex-A35, 1 GB RAM, 8 GB eMMC (Hynix H8G4a2), 480×800 panel
   shown landscape. Android Things 8.1, **32-bit userspace** on a 64-bit 4.4.95 kernel. **Observed.**
 - `ro.treble.enabled=false`, no VNDK, monolithic sepolicy: **no GSIs.** **Observed.**
+- The USB-A port's data uses the USB 2 pins; the extra USB 3 pins carry the SoC's UART console. **Reported**
+  (untocodes: 1.8 V, 921600 baud) and from the person; the voltage has to be checked before connecting anything.
 - USB-A port is host-only under Android (OTG ID pulled low): **no USB adb.** Since observed (e2e run 2, with
   root): with the cable that carried fastboot minutes earlier, Android's device controller reports `not attached`
   and the kernel logs `usb_state<DISCONNECTED>` every 5 s, while `sys.usb.config=adb`. Fastboot, BROM and the preloader
