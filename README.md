@@ -25,7 +25,7 @@ Smart Display 8, and it looks and works the same way.
 
 |    | Clock | Model | Status |
 |----|-------|-------|--------|
-| ⚠️ | Lenovo Smart Clock (gen 1) | CD-24501F | **Early.** Tested on one clock, stock to kiosk seven times. [Device notes](devices/cube/README.md) |
+| ⚠️ | Lenovo Smart Clock (gen 1) | CD-24501F | **Early.** Tested on one clock, stock to kiosk dozens of times. [Device notes](devices/cube/README.md) |
 | ❌ | Lenovo Smart Clock 2 | CD-24502F | **Not supported.** Android 10, different firmware. Kiosk Satellite has its own notes for it |
 | ❌ | Lenovo Smart Clock Essential | CD-24503F | **Not supported.** No touchscreen |
 
