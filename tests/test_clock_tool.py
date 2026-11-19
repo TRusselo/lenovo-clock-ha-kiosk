@@ -1123,3 +1123,20 @@ def test_restores_second_session_shows_one_unplug_box(tmp_path, monkeypatch):
                     sleep=lambda s: None)
     boxes = [l for l in ui.lines if l.startswith("[physical]")]
     assert sum("this time to write" in b for b in boxes) == 1
+
+
+def test_power_pulled_while_writing_is_flashed_again_and_said_so(tmp_path, monkeypatch):
+    # Writing starts at "-> flash:": a pull after it isn't "before anything was written", and the flash
+    # starts again once the clock is back in fastboot, rather than stopping setup.
+    monkeypatch.setattr(flash, "uv_path", lambda ctx: Path("uv"))
+    monkeypatch.setattr(flash, "fetch", lambda id_, ctx: Path("fbmulti.py"))
+    waits = []
+    monkeypatch.setattr(flash, "wait_for_mode", lambda mode, ctx, prompt: waits.append(mode))
+    pulled = "-> download:02000000\n  <- DATA02000000\n  <- OKAY\n-> flash:boot_a\nusb.core.USBError: [Errno 19]\n"
+    runner = SpawnRunner([FakeProc([True], 1, pulled, None), FakeProc([True], 0, "ALL DONE in 3 s", None)])
+    ui = FakeUI()
+    flash.fbmulti(ctx_for(tmp_path, runner=runner, ui=ui, detect=lambda: []), [(tmp_path / "b.img", "boot_a")],
+                  title="t", sleep=lambda s: None)
+    assert len(runner.spawned) == 2 and len(waits) == 2
+    assert any("while writing" in l for l in ui.lines)
+    assert not any("before anything was written" in l for l in ui.lines)

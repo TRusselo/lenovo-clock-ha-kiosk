@@ -91,23 +91,22 @@ def fbmulti(ctx, pairs: list[tuple[Path, str]], *, title: str, sleep=time.sleep)
                 while proc.poll() is None:
                     done = _flashed(log)
                     job.note(f"{done} of {len(pairs)}", done, len(pairs))
-                    # Gone from fastboot before anything was written: wait again now, not after fbmulti.py's
-                    # own 300 s (review of the run 7 fixes). A few looks, so a USB blip isn't taken for it.
-                    gone = gone + 1 if done == 0 and _mode(ctx) not in (Mode.FASTBOOT, None) else 0
+                    # Gone from fastboot: wait again now, not after fbmulti.py's own 300 s (review of the run 7
+                    # fixes). A few looks, so a USB blip isn't taken for it.
+                    gone = gone + 1 if _mode(ctx) not in (Mode.FASTBOOT, None) else 0
                     if gone >= LEFT_AFTER:
                         proc.kill()
-                        ctx.runner.finished(proc)
                         break
                     sleep(1)
-                if gone >= LEFT_AFTER:
-                    job.pause("The clock left fastboot mode before anything was written")
-                    continue
                 text = ctx.runner.finished(proc)
                 if proc.returncode == 0 and "ALL DONE" in text:
                     return
-                if "no fastboot device" in text:
-                    # Left fastboot before fbmulti.py got it: nothing was written. Wait again.
-                    job.pause("The clock left fastboot mode before anything was written")
+                wrote = _writing(text)
+                if gone >= LEFT_AFTER or "no fastboot device" in text or _mode(ctx) not in (Mode.FASTBOOT, None):
+                    # The clock left fastboot (unplugged, a loose cable). Flashing again from the start is
+                    # safe, so wait for it and do that, rather than stop setup.
+                    job.pause("The clock left fastboot mode while writing: it's flashed again from the start"
+                              if wrote else "The clock left fastboot mode before anything was written")
                     continue
                 last = [l for l in text.splitlines() if l.strip()][-1:] or ["no output"]
                 # Raised inside the job, so its line ends with a cross, not a tick (e2e run 7).
@@ -118,8 +117,14 @@ def fbmulti(ctx, pairs: list[tuple[Path, str]], *, title: str, sleep=time.sleep)
                 proc.kill()
                 ctx.runner.finished(proc)
             raise
-    raise FlashFailed("The clock kept leaving fastboot mode before the flash could start. Nothing was written. "
-                      "Unplug its power and run the same command again.")
+    raise FlashFailed("The clock kept leaving fastboot mode, so the flash couldn't finish"
+                      + (", and was partly written" if wrote else "; nothing was written")
+                      + ". Unplug its power and run the same command again.")
+
+
+def _writing(text: str) -> bool:
+    """fbmulti.py has started writing a partition: a download alone writes nothing, "-> flash:" does."""
+    return "-> flash:" in text
 
 
 def _mode(ctx) -> Mode | None:
