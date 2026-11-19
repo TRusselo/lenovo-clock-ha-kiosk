@@ -58,7 +58,7 @@ def test_this_systems_e2fsprogs_edits_a_user_data_image(tmp_path):
         newline="\n")
     out = userdata.dbg(str(img), ["mkdir system", "mkdir system/users", "mkdir system/users/0", "mkdir property",
                                   "mkdir misc", "mkdir misc/adb", "mkdir misc/wifi",
-                                  "write settings_global.xml system/users/0/settings_global.xml"])
+                                  "cd /system/users/0", "write settings_global.xml settings_global.xml"])
     got = userdata.cat(str(img), "/system/users/0/settings_global.xml")
     if b"adb_enabled" not in got:
         diag = [out]

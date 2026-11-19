@@ -74,8 +74,13 @@ def put(img, tmp, path, data, uid, gid, mode, ctx):
     rel, relctx = (os.path.relpath(x, folder).replace(os.sep, "/") for x in (local, ctxf))
     if exists(img, path):
         dbg(img, [f"rm {path}"])
+    parent, name = path.rsplit("/", 1)
     dbg(img, [
-        f"write {rel} {path}",
+        # cd first, then a plain name: debugfs 1.44 (Windows' Cygwin build) makes "write a /x/y" a file
+        # literally named "/x/y" in the current folder (e2e CI on Windows); 1.47 resolves the path.
+        f"cd {parent or '/'}",
+        f"write {rel} {name}",
+        "cd /",
         f"set_inode_field {path} uid {uid}",
         f"set_inode_field {path} gid {gid}",
         f"set_inode_field {path} mode 0{0o100000 | mode:o}",
