@@ -35,7 +35,9 @@ highlighted. Under it, the job in progress counts up, such as "37%" for the back
 - **Yellow is your turn.** An "On the clock" box says what to do there, with the buttons in bold. A yellow
   question waits for you to type or press Enter.
 - **Clock mode** shows which mode the clock is in while the tool waits for it. It keeps waiting as long as you
-  need: press Ctrl-C to stop.
+  need, so you can walk away: press Ctrl-C to stop.
+- **If the clock drops out** during a step over Wi-Fi (it restarted, or lost power or Wi-Fi), the tool says so,
+  waits for it to come back, and starts that step again.
 - **Red means something went wrong.** The tool shows the last lines of its log and where the log is saved.
 
 ## Before you start
@@ -60,9 +62,9 @@ The clock runs on its barrel plug; the USB cable alone doesn't start it.
 
 - Kiosk Satellite's settings: on the clock, or in a browser at `http://<the clock's address>:2324`. The tool
   shows the address at the end.
-- [Lenovo Clock Dashboard](https://github.com/TRusselo/lenovo-clock-dashboard): a Home Assistant dashboard made for the clock's small screen. Install it with
-  HACS; its own page has the steps, and is where to ask about it.
-  Import it into Home Assistant, then pick it in Kiosk Satellite.
+- [Lenovo Clock Dashboard](https://github.com/TRusselo/lenovo-clock-dashboard): a Home Assistant dashboard made
+  for the clock's small screen. Install it with HACS, then pick it in Kiosk Satellite. Its own page has the steps,
+  and is where to ask about it.
 - [Time zones](TIMEZONES.md): why the clock uses a fixed-offset zone.
 - Another backup, at any time: `lck backup --name <a new name>`.
 - To go back to a backup: `lck restore`, explained under "How it works" in the [README](../README.md#how-it-works).
@@ -74,6 +76,7 @@ The clock runs on its barrel plug; the USB cable alone doesn't start it.
 - It can take two or three tries. Unplug the power fully each time.
 - If a try fails, the tool says why and starts the next one on a fresh screen. If the clock is still held by the
   last try, it asks you to unplug the power first.
+- Check the cable: straight-through A-to-A, into the clock's USB port.
 
 ## Copying text from the terminal
 
@@ -85,7 +88,6 @@ within 5 seconds stops it.
 Use `lck restore`, never the clock's own factory reset. A reset while online unlinks the clock from your Google
 account, which no restore can undo: it then stays on Google's setup screen until you set it up again in Google
 Home.
-- Check the cable: straight-through A-to-A, into the clock's USB port.
 
 ## Why everything after the flash is over Wi-Fi
 
@@ -95,20 +97,24 @@ reach it there.
 
 ## If the clock doesn't come back
 
-If you typed your Wi-Fi name and password into the tool and the clock shows its clock face but no IP address (under
-Settings, About device), the details were probably mistyped. At the address question, type wifi to enter them
+If you typed your Wi-Fi name and password into the tool and the clock says "Can't connect to Wi-Fi", or shows no
+IP address (at the top of Google's setup screen, or under Settings, About device), the details were probably
+mistyped. At the address question, type wifi to enter them
 again: the tool writes only the user data again, in fastboot mode.
 
 The clock's address can change whenever it restarts. When it's slow to answer, the tool asks whether it has, so you
 can type the new one and carry on. It never relies on an address from an earlier run without checking it.
 
-After the flash, the first start takes a few minutes, and the clock joins the Wi-Fi saved in the backup. If the
-tool can't reach it:
+After the flash, the first start takes a few minutes, and the clock joins the Wi-Fi saved in the backup, or the
+one you typed. If the tool can't reach it:
 
-1. Check the screen: the clock face means it started.
-2. Find its address on the clock (swipe up from the bottom, the gear, About device, IP address) or in your
-   router's list of devices, and run the same command with `--ip <address>`.
-3. If the Wi-Fi saved in the backup no longer exists, the clock has no network. Please report this.
+1. Check the screen: the clock face, or Google's setup screen, means it started.
+2. Find its address: the "IP=" line at the top of the setup screen, or swipe up from the bottom, the gear, About
+   device, IP address, or your router's list of devices. Type it at the address question, or run the same
+   command with `--ip <address>`.
+3. If it has no address, it isn't on Wi-Fi. If you typed the Wi-Fi, type wifi at the address question (above).
+   If the Wi-Fi came from the backup and that network is gone, run setup again with a new name (`--name`) and
+   answer NO to the Wi-Fi question, to type a working one.
 
 ## Problems or questions
 

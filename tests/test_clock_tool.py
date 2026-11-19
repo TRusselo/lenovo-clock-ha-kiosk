@@ -772,7 +772,7 @@ def test_the_wifi_answer_is_saved_but_never_the_password(tmp_path):
 
 
 def test_mistyped_wifi_can_be_entered_again_and_only_userdata_is_rewritten(tmp_path, monkeypatch):
-    # Tristyn: a mistyped name or password leaves the clock off Wi-Fi, with no adb: loop until it joins.
+    # A mistyped name or password leaves the clock off Wi-Fi, with no adb: loop until it joins.
     from lck import images, system
     import lck.flash as flash_mod
     rebuilt, flashed = [], []

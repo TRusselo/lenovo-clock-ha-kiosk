@@ -23,10 +23,15 @@ You're probably helping someone convert a Lenovo Smart Clock gen 1 (CD-24501F, "
   may be connected too.
 - **Physical steps:** the screen stays dark in fastboot and BROM. Find the mode from the USB IDs: `0e8d:0003`
   is BROM, `0e8d:2000` is the preloader, `0bb4:0c01` is LK fastboot. The clock runs on the barrel jack, not USB.
-- **LK's fastboot hangs on `getvar`.** Start the command first (`fbmulti.py` waits for the device), then have the
-  person enter fastboot. Likewise mtkclient: BROM lasts only 3 to 5 seconds, so it must already be waiting.
+- **LK's fastboot hangs on `getvar`.** Flash with `fbmulti.py`; it waits up to 300 s for the device, so have the
+  person enter fastboot first, or start it again. mtkclient is the other way round: BROM lasts only 3 to 5
+  seconds, so it must already be waiting. VOLUME UP alone reaches BROM. A clock left at `0e8d:2001` by an earlier
+  mtkclient session must be unplugged before the next one.
 - **Secrets:** never ask for, print or store Wi-Fi passwords, Home Assistant tokens or the Kiosk Satellite admin
-  password. The injected userdata image holds the Wi-Fi PSK: keep it out of the repo and logs.
+  password. When a Wi-Fi network has to be typed, the person types it into the tool, which hides and never logs
+  the password. The injected userdata image holds the Wi-Fi PSK: keep it out of the repo and logs.
+- **Never factory reset the clock** to go back: done online, it unlinks it from Google, which no restore undoes.
+  Use `lck restore`.
 - **Backups:** never upload or share a backup. It holds data unique to that clock.
 
 ## Working on this repo

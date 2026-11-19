@@ -17,7 +17,7 @@ Smart Display 8, and it looks and works the same way.
 
 > [!CAUTION]
 > **Vibecoded, unaudited, your risk, and early.** The code, notes and docs were written by an AI (Claude) in
-> conversation with the author, and tested on one clock. It unlocks the bootloader and rewrites partitions, so
+> conversation with the author, and tested on one clock, through seven end-to-end runs. It unlocks the bootloader and rewrites partitions, so
 > **it can brick the clock.** The tool makes a full backup first and won't go on without one. No warranty, no
 > support.
 
@@ -25,7 +25,7 @@ Smart Display 8, and it looks and works the same way.
 
 |    | Clock | Model | Status |
 |----|-------|-------|--------|
-| ⚠️ | Lenovo Smart Clock (gen 1) | CD-24501F | **Early.** Tested on one clock. [Device notes](devices/cube/README.md) |
+| ⚠️ | Lenovo Smart Clock (gen 1) | CD-24501F | **Early.** Tested on one clock, stock to kiosk seven times. [Device notes](devices/cube/README.md) |
 | ❌ | Lenovo Smart Clock 2 | CD-24502F | **Not supported.** Android 10, different firmware. Kiosk Satellite has its own notes for it |
 | ❌ | Lenovo Smart Clock Essential | CD-24503F | **Not supported.** No touchscreen |
 
@@ -53,7 +53,7 @@ The tool checks the model over Wi-Fi before it changes anything there, and refus
 - Your Wi-Fi: the clock booted and connected to it (set it up with the Google Home app), or your Wi-Fi name
   and password to type into the tool. The first thing it asks is which
 - Home Assistant
-- About 1 hour 30 minutes; most of it is waiting
+- About an hour and a quarter; most of it is waiting (the backup alone is about 35 minutes)
 
 ## Quick start
 
@@ -116,15 +116,19 @@ Android. So the tool:
   Kiosk Satellite;
 - **tells you exactly which buttons to hold, and when to let go.** The screen stays dark in those modes, so the
   tool shows which mode the clock is in;
+- **waits as long as you need,** and when the clock drops out during a step over Wi-Fi, waits for it and does that
+  step again;
 - **can stop and pick up again.** Run the same command again to continue where it stopped.
 
-Your Wi-Fi comes back from the backup (or the tool adds the one you type), and the Home Assistant sign-in is done **on the clock itself** or in a
-browser at an address the tool shows you. The tool never sees your passwords.
+Your Wi-Fi comes back from the backup (or the tool adds the one you type, which it never logs), and the Home
+Assistant sign-in is done **on the clock itself** or in a browser at an address the tool shows you.
 
 **To make another backup** at any time: `.venv/bin/python -m lck backup --name clock-later`.
 **To go back** to a backup, in the same folder: `.venv/bin/python -m lck restore backup/clock.zip`. It checks the
 backup is from this clock, then writes it back in BROM mode. It takes about 20 minutes. A backup only restores to
-the clock it came from.
+the clock it came from. The bootloader stays unlocked; stock starts fine that way. **Never use the clock's own
+factory reset to go back:** done while online, it unlinks the clock from your Google account, which no restore can
+undo.
 
 ## Credits
 

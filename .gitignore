@@ -20,3 +20,6 @@ __pycache__/
 
 # dashboard notes from the old in-repo copy (the dashboard lives in lenovo-clock-dashboard now)
 dashboard/
+
+# uv run creates this; the project installs with pip from requirements.txt
+uv.lock

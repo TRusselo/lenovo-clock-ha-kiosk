@@ -1,6 +1,6 @@
 # Linux, step by step
 
-For x86-64 and ARM64 PCs with Python 3.10 or newer. It takes about **1 hour 30 minutes**, most of it waiting.
+For x86-64 and ARM64 PCs with Python 3.10 or newer. It takes about **an hour and a quarter**, most of it waiting.
 
 New to this? [Words you'll see](../README.md#words-youll-see) explains terminal, BROM mode, fastboot mode and slots
 in a few lines.
