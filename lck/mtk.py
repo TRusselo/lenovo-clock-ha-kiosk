@@ -77,6 +77,9 @@ def why_failed(text: str) -> str:
     if "flash size 0x0" in text or "Couldn't detect partition" in text:
         return "the clock was still held by the last try, so nothing could be read. Nothing was written"
     if "USBError" in text or "Errno 19" in text or "Errno 5" in text:
+        if "Write:" in text or "Wrote " in text:
+            # e2e run 8: a restore lost USB partway through its writes. The next try writes it all again.
+            return "the USB connection dropped, with the backup partly written. The next try writes it all again"
         return "the USB connection dropped. Nothing was written"
     if not text.strip():
         return "the clock didn't reach BROM mode"

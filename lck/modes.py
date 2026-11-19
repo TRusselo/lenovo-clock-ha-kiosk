@@ -170,7 +170,8 @@ def wait_for_mode(target: Mode, ctx, *, prompt: str, timeout: float = 180,
             ui.redraw()
             ui.physical(prompt)
             ui.say("Still waiting. Do the steps above whenever you're ready, or press Ctrl-C to stop.")
-            start, hinted, wrong, last = clock(), False, None, None
+            # The hint stays said once per wait: again after every reminder was noise (e2e run 8).
+            start, wrong, last = clock(), None, None
         sleep(POLL_SECONDS)
 
 

@@ -1140,3 +1140,27 @@ def test_power_pulled_while_writing_is_flashed_again_and_said_so(tmp_path, monke
     assert len(runner.spawned) == 2 and len(waits) == 2
     assert any("while writing" in l for l in ui.lines)
     assert not any("before anything was written" in l for l in ui.lines)
+
+
+# --- e2e run 8 ----------------------------------------------------------------
+
+def test_a_usb_drop_while_writing_doesnt_say_nothing_was_written():
+    # e2e run 8: restore lost USB 7 minutes into its writes and said "Nothing was written".
+    text = ("Write: (0x6D600000/0x13FE56E00), 10.22 MB/s\nDeviceClass - USBError(5, 'Input/Output Error')\n")
+    reason = mtk.why_failed(text)
+    assert "Nothing was written" not in reason and "partly written" in reason
+    assert "Nothing was written" in mtk.why_failed("Dumped sector 1\nusb.core.USBError: [Errno 19]")
+
+
+def test_an_adb_copy_cut_by_a_power_pull_counts_as_losing_the_clock():
+    # e2e run 8: a power pull during the Magisk patch's copy stopped setup instead of waiting.
+    from lck.runner import CommandFailed
+    e = CommandFailed(["adb", "push"], Result(1, "adb: error: failed to read copy response: EOF\n"))
+    assert clock.lost(e)
+
+
+def test_the_nothing_yet_hint_comes_once_per_wait(tmp_path):
+    # e2e run 8: it came again 30 s after every "Still waiting" reminder.
+    ui = _fastboot_wait(tmp_path, [(t, []) for t in range(0, 700, 10)] + [(700, [Mode.FASTBOOT])])
+    assert sum("Nothing yet" in l for l in ui.lines) == 1
+    assert sum("Still waiting" in l for l in ui.lines) >= 2

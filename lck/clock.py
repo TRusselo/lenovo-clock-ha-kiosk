@@ -27,7 +27,8 @@ class NotAClock(Exception):
 
 
 _LOST = re.compile(r"device offline|device '[^']*' not found|no devices|closed|protocol fault|"
-                   r"Connection reset|Connection refused|failed to connect|cannot connect", re.I)
+                   r"Connection reset|Connection refused|failed to connect|cannot connect|"
+                   r"failed to read copy response", re.I)   # e2e run 8: power pulled mid-copy
 
 
 def lost(e: BaseException) -> bool:
