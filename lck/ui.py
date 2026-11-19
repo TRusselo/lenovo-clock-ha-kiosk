@@ -161,8 +161,9 @@ class UI:
         if self.logger:
             self.logger.info("%s %s", kind, plain(text).replace("\n", " / "))
 
-    def say(self, text: str) -> None:
-        self._log("SAY", text)
+    def say(self, text: str, log: bool = True) -> None:
+        if log:
+            self._log("SAY", text)
         self._end_status()
         if self._box_shown:
             self._since_box.append(text)
@@ -182,7 +183,7 @@ class UI:
             pending, self._since_box = self._since_box, []
             self.redraw()
             for line in pending:
-                self.say(line)
+                self.say(line, log=False)      # already in the log once (e2e run 7: logged twice)
         self._box_shown = True
         self._since_box = []
         if self._colour():
@@ -436,7 +437,7 @@ class UI:
         self.stdout.flush()
         return self.stdin.readline().rstrip("\r\n")
 
-    def ask(self, text: str) -> str:
+    def ask(self, text: str, log_answer: bool = True) -> str:
         self._log("ASK", text)
         self._end_status()
         self._users_turn()
@@ -458,7 +459,7 @@ class UI:
             self.stdout.flush()
             line = self.stdin.readline()
         line = line.rstrip("\r\n")
-        self._log("ANSWER", line)
+        self._log("ANSWER", line if log_answer else "(answer not logged)")
         return line
 
 

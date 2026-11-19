@@ -12,7 +12,9 @@ _PATTERNS = [
     # <string name="flutter.ks.remote.password">value</string>
     re.compile(rf'(<string name="[^"]*(?:{_SECRET_KEYS})[^"]*">)([^<]*)(</string>)', re.I),
     re.compile(r"(\bBearer\s+)(\S+)", re.I),
-    re.compile(rf"(\b\w*(?:{_SECRET_KEYS})\w*\s*[=:]\s*)([^\s,;&\"'<]+)", re.I),
+    # key=value, or key:value with nothing between: "token: http://…" in a sentence is prose, not a secret
+    # (e2e run 7 masked a message that way).
+    re.compile(rf"(\b\w*(?:{_SECRET_KEYS})\w*(?:\s*=\s*|:))([^\s,;&\"'<]+)", re.I),
 ]
 
 

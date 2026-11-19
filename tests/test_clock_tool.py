@@ -439,7 +439,7 @@ def test_flash_says_found_it_only_after_asking(tmp_path, monkeypatch):
     flash.fbmulti(ctx_for(tmp_path, runner=runner, ui=ui, detect=lambda: [Mode.FASTBOOT]),
                   [(tmp_path / "b.img", "boot_a")], title="t", sleep=lambda s: None)
     assert not any("Found it" in l or l.startswith("[physical]") for l in ui.lines)
-    assert any("still in fastboot" in l for l in ui.lines)
+    assert any("fastboot mode already" in l for l in ui.lines)
 
 
 def test_power_cycle_box_waits_for_the_clock_to_leave_fastboot(tmp_path):
@@ -880,3 +880,74 @@ def test_what_the_person_is_told_and_answers_is_logged_but_not_secrets():
     ui.ask_secret("Wi-Fi password: ")
     log = stream.getvalue()
     assert "USB connection dropped" in log and "ANSWER 10.0.0.7" in log and "hunter22" not in log
+
+
+def test_flash_waits_for_fastboot_before_starting_and_never_times_out(tmp_path, monkeypatch):
+    # e2e run 7: fbmulti.py gave up after 300 s with the person away; the tool must wait first.
+    monkeypatch.setattr(flash, "uv_path", lambda ctx: Path("uv"))
+    monkeypatch.setattr(flash, "fetch", lambda id_, ctx: Path("fbmulti.py"))
+    waits = []
+    monkeypatch.setattr(flash, "wait_for_mode", lambda mode, ctx, prompt: waits.append(mode))
+    runner = SpawnRunner([FakeProc([], 1, "no fastboot device after 300 s", None),
+                          FakeProc([True], 0, "ALL DONE in 3 s", None)])
+    ui = FakeUI()
+    flash.fbmulti(ctx_for(tmp_path, runner=runner, ui=ui, detect=lambda: []),
+                  [(tmp_path / "b.img", "boot_a")], title="t", sleep=lambda s: None)
+    assert waits == [Mode.FASTBOOT, Mode.FASTBOOT] and len(runner.spawned) == 2
+
+
+def test_a_failed_flash_doesnt_end_with_a_tick(tmp_path, monkeypatch):
+    monkeypatch.setattr(flash, "uv_path", lambda ctx: Path("uv"))
+    monkeypatch.setattr(flash, "fetch", lambda id_, ctx: Path("fbmulti.py"))
+    runner = SpawnRunner([FakeProc([], 1, "flash failed: boot_a", None)])
+    ui = FakeUI()
+    with pytest.raises(flash.FlashFailed, match="flash failed"):
+        flash.fbmulti(ctx_for(tmp_path, runner=runner, ui=ui, detect=lambda: [Mode.FASTBOOT]),
+                      [(tmp_path / "b.img", "boot_a")], title="Flashing", sleep=lambda s: None)
+
+
+def test_a_short_password_asks_only_the_password_again(tmp_path):
+    from lck import system
+    ui = FakeUI(["Home", "short", "long-enough"])
+    assert system.ask_wifi(ctx_for(tmp_path, ui=ui)) == ("Home", "long-enough")
+    assert sum(l.startswith("[ask] Wi-Fi name") for l in ui.lines) == 1
+
+
+def test_the_secret_filter_leaves_prose_alone():
+    from lck.log import redact
+    assert redact("Easier in a browser, for typing your address and token: http://x:2324") \
+        == "Easier in a browser, for typing your address and token: http://x:2324"
+    assert redact("password=hunter22 token:abc") == "password=*** token:***"
+
+
+def test_a_usb_pull_is_reported_as_a_usb_pull(tmp_path, monkeypatch):
+    # e2e run 7: the reason came from an empty text, "didn't reach BROM", though it had been reading.
+    monkeypatch.setattr(mtk, "_python", lambda ctx: ["python"])
+    monkeypatch.setattr(mtk, "script", lambda ctx: Path("mtk.py"))
+
+    def pulled(ctx, proc, log, *a, **k):
+        log.write_text("Dumped sector 1...\nusb.core.USBError: [Errno 19] No such device\n")
+        raise mtk.MtkFailed("x")
+
+    def fine(ctx, proc, log, *a, **k):
+        proc.wait()
+        return "Dumped x"
+    seq = [pulled, fine]
+    monkeypatch.setattr(mtk, "_follow", lambda *a, **k: seq.pop(0)(*a, **k))
+    runner = SpawnRunner([FakeProc([], 1, "", None), FakeProc([], 0, "Dumped x", None)])
+    ui = FakeUI()
+    mtk.run_in_brom(ctx_for(tmp_path, runner=runner, ui=ui, detect=lambda: []), ["rf a.bin"], cwd=tmp_path,
+                    title="t", sleep=lambda s: None)
+    assert any("USB connection dropped" in l for l in ui.lines)
+
+
+def test_a_rerun_reuses_magisks_patch(tmp_path, monkeypatch):
+    from lck import root
+    boot = tmp_path / "boot-stock.img"
+    boot.write_bytes(b"ANDROID!stock")
+    out = tmp_path / "work" / "clock" / "images" / "boot-magisk.img"
+    out.parent.mkdir(parents=True)
+    out.write_bytes(b"ANDROID!patched")
+    out.with_name(out.name + ".from").write_text(f"{backup.sha256(boot)} {root.MAGISK_VERSION}")
+    monkeypatch.setattr(root, "patch_files", lambda ctx: pytest.fail("patched again"))
+    assert root.patch(ctx_for(tmp_path), boot) == out

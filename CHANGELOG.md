@@ -6,6 +6,22 @@ What changed for people converting a clock. Newest first.
 
 - **The dashboard has its own home:** [lenovo-clock-dashboard](https://github.com/TRusselo/lenovo-clock-dashboard), installed with HACS. Its copy in this repo
   is gone, so there's one place to get it and ask about it.
+### Fixes from the seventh end-to-end run
+- **Fastboot waits never give up.** The flash helper stopped setup after 5 minutes without a device (twice, with
+  the person away). The tool now waits for fastboot mode itself, for as long as it takes, and starts the flash
+  only once the clock is there; if the clock leaves fastboot first, it asks again. A failed flash ends with ✗,
+  not ✓.
+- **A USB pull during a BROM job** is reported as one ("the USB connection dropped. Nothing was written").
+- **Restore's second BROM session** reads as the normal next step ("Now unplug the clock's round power plug: it
+  goes into BROM mode once more, this time to write"), not "still held by the last try". No "Nothing yet" hint
+  during the handover from BROM.
+- **After the backup**, the fastboot wait asks you to unplug the clock first, instead of two boxes at once.
+- **Magisk:** while you work in it, Cast's "Link Account" screen is stopped and Magisk brought back if it takes
+  over. A rerun reuses the boot image Magisk already patched.
+- **Wi-Fi:** a too-short password asks only for the password again; the message about the work folder names the
+  password you typed; the Wi-Fi name stays out of the log.
+- **Log:** "token:" in a sentence is no longer masked; lines carried to a redrawn box aren't logged twice.
+
 ### Fixes from the sixth end-to-end run (planned faults)
 - **Losing the clock no longer stops setup:** a power cut, restart or Wi-Fi drop in a step over Wi-Fi now says so,
   waits for the clock to come back, and starts that step again (up to 3 times). Errors read as words, not command

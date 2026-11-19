@@ -11,8 +11,10 @@ ramdisk loads. Undo: flash boot-stock.img (kept in the work folder) to boot_a.
 """
 from __future__ import annotations
 
+import contextlib
 import re
 import shutil
+import threading
 import time
 import zipfile
 from pathlib import Path
@@ -25,6 +27,8 @@ from lck.steps import Step
 from lck.ui import choose
 
 MAGISK_PKG = "com.topjohnwu.magisk"
+CAST_PKG = "com.google.android.apps.mediashell"
+MAGISK_VERSION = "31.1"   # the manifest's pin: a patch made with another Magisk isn't reused
 DEVICE_DIR = "/data/local/tmp/lck-magisk"
 FILES = {
     "assets/boot_patch.sh": "boot_patch.sh",
@@ -71,8 +75,14 @@ def stock_boot(ctx) -> Path:
 
 def patch(ctx, boot: Path) -> Path:
     """Patch `boot` on the clock, with Magisk's script, and bring the result back."""
-    files = patch_files(ctx)
     out = images.work(ctx) / "images" / "boot-magisk.img"
+    stamp = out.with_name(out.name + ".from")
+    made_from = f"{backup.sha256(boot)} {MAGISK_VERSION}"
+    if out.exists() and stamp.exists() and stamp.read_text() == made_from:
+        # e2e run 7: a rerun patched again each time (about 1.5 min); the result doesn't change.
+        ctx.ui.say("Using the boot image Magisk patched on the last run.")
+        return out
+    files = patch_files(ctx)
     shell(ctx, "rm", "-rf", DEVICE_DIR, check=False)
     shell(ctx, "mkdir", "-p", DEVICE_DIR)
     with ctx.ui.busy("Patching the boot image with Magisk, on the clock"):
@@ -87,6 +97,7 @@ def patch(ctx, boot: Path) -> Path:
     shell(ctx, "rm", "-rf", DEVICE_DIR, check=False)
     if out.stat().st_size == 0 or out.read_bytes()[:8] != b"ANDROID!":
         raise RootFailed("The patched boot image came back damaged. Nothing was flashed.")
+    stamp.write_text(made_from)
     return out
 
 
@@ -123,11 +134,35 @@ def open_magisk(ctx, tries: int = 3, sleep=time.sleep) -> None:
     the first launch can be lost or covered (e2e runs 3 and 4)."""
     for _ in range(tries):
         # On a clock not linked to Google, Cast's setup screen keeps opening over Magisk (e2e run 6).
-        shell(ctx, "am", "force-stop", "com.google.android.apps.mediashell", check=False)
+        shell(ctx, "am", "force-stop", CAST_PKG, check=False)
         shell(ctx, "monkey", "-p", MAGISK_PKG, "-c", "android.intent.category.LAUNCHER", "1", check=False)
         sleep(3)
         if front_app(ctx).startswith(MAGISK_PKG):
             return
+
+
+@contextlib.contextmanager
+def keep_magisk_in_front(ctx, every: float = 4.0):
+    """While the person works in Magisk: if Cast's setup screen ("Link Account") takes the screen, which
+    it does on a clock not linked to Google (e2e runs 6 and 7), stop Cast and bring Magisk back."""
+    stop = threading.Event()
+
+    def watch():
+        while not stop.wait(every):
+            try:
+                if front_app(ctx).startswith(CAST_PKG):
+                    shell(ctx, "am", "force-stop", CAST_PKG, check=False)
+                    shell(ctx, "monkey", "-p", MAGISK_PKG, "-c", "android.intent.category.LAUNCHER", "1",
+                          check=False)
+            except Exception:
+                pass
+    t = threading.Thread(target=watch, daemon=True)
+    t.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        t.join(timeout=every + 30)
 
 
 class RootStep(Step):
@@ -181,7 +216,9 @@ class RootStep(Step):
                         "  3. Tap the back arrow, top left. Shell is now listed, with its switch on\n"
                         "Stay out of the Modules tab: its file picker has no way back on this screen.")
         while not clock.has_root(ctx):
-            if choose(ctx.ui, "Press Enter once Shell is switched on, or type stop: ", "stop"):
+            with keep_magisk_in_front(ctx):
+                stopped = choose(ctx.ui, "Press Enter once Shell is switched on, or type stop: ", "stop")
+            if stopped:
                 raise RootFailed("Stopped before root was granted. Run the same command again to carry on.")
             shell(ctx, "su", "-c", "id", check=False, timeout=30)
             if not clock.has_root(ctx) and not front_app(ctx).startswith(MAGISK_PKG):

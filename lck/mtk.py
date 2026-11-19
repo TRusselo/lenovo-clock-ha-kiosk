@@ -65,6 +65,8 @@ def prepare(ctx) -> None:
                        timeout=1800)
 
 
+NEXT_SESSION = ("Now unplug the clock's round power plug: it goes into BROM mode once more, this time to write. Wait "
+                "3 seconds, then do the steps below.")
 STALE = ("The clock is still held by the last try. Unplug its round power plug, wait 3 seconds, then do the "
          "steps below.")
 
@@ -93,7 +95,7 @@ def _ok(text: str, commands: list[str]) -> bool:
     return True
 
 
-def release_stale(ctx, sleep=time.sleep) -> None:
+def release_stale(ctx, sleep=time.sleep, message: str = STALE) -> None:
     """A clock still in BROM or held by mtkclient's download agent from a stopped or failed session
     (0e8d:2001) makes the next session read nothing. Only unplugging it frees it (e2e run 6)."""
     try:
@@ -101,7 +103,7 @@ def release_stale(ctx, sleep=time.sleep) -> None:
     except Exception:
         return
     if mode in (Mode.DA, Mode.BROM, Mode.PRELOADER):
-        ctx.ui.physical(STALE)
+        ctx.ui.physical(message)
         with ctx.ui.busy("Waiting for the clock's power to be unplugged") as job:
             while current(ctx) != Mode.NONE:
                 sleep(0.5)
@@ -109,7 +111,8 @@ def release_stale(ctx, sleep=time.sleep) -> None:
 
 
 def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str = BROM_PROMPT,
-                sleep=time.sleep, timeout: float = 4 * 3600, weights: list[int] | None = None) -> str:
+                sleep=time.sleep, timeout: float = 4 * 3600, weights: list[int] | None = None,
+                held_message: str = STALE) -> str:
     """Start mtkclient with `commands` (one session), ask for BROM, and show progress
     until it's done. A failed attempt (the preloader, a stale BROM) is retried with a
     fresh power-cycle; nothing is written in a failed attempt before the DA takes over."""
@@ -121,7 +124,9 @@ def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str 
     args += ["multi", ";".join(commands)] if len(commands) > 1 else commands[0].split()
     logger = ctx.state.get("log")
     for attempt in range(1, TRIES + 1):
-        release_stale(ctx, sleep)
+        # The first try may follow a session that ended normally (restore reads, then writes): its
+        # own words then (e2e run 7: "still held by the last try" read as a failure).
+        release_stale(ctx, sleep, held_message if attempt == 1 else STALE)
         log = cwd / "mtk-output.txt"
         proc = ctx.runner.spawn(args, out_file=log, cwd=cwd)
         try:
@@ -129,7 +134,11 @@ def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str 
             ctx.ui.status("waiting for BROM")
             text = _follow(ctx, proc, log, title, sleep, timeout, commands, prompt, weights)
         except MtkFailed:
-            text = ""
+            # The output so far tells why (e2e run 7: a USB pull was reported as "didn't reach BROM").
+            try:
+                text = log.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                text = ""
         except BaseException:
             proc.kill()
             ctx.runner.finished(proc)
@@ -167,7 +176,7 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
             weights=None) -> str:
     start = time.monotonic()
     last = None
-    hinted = nothing_hinted = False
+    hinted = nothing_hinted = seen_brom = False
     reprompts = 1
     guard: dict = {}
     while proc.poll() is None:
@@ -193,7 +202,10 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
         if mode == Mode.DA:
             break
         waited = time.monotonic() - start
-        if mode == Mode.NONE and not nothing_hinted and waited > HINT_AFTER:
+        if mode == Mode.BROM:
+            seen_brom = True
+        # Nothing on USB between BROM and the download agent is the handover, not a miss (e2e run 7).
+        if mode == Mode.NONE and not nothing_hinted and not seen_brom and waited > HINT_AFTER:
             ctx.ui.say(NOTHING_HINT)
             nothing_hinted = True
         if waited > REPROMPT_AFTER * reprompts:

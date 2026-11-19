@@ -110,13 +110,22 @@ def ask_wifi(ctx):
     ctx.ui.say("The clock needs a Wi-Fi network to come back on after the flash. The tool adds yours to its user "
                "data. The password is kept only in the work folder's images, like a backup's own, and never logged.")
     while True:
-        ssid = ctx.ui.ask("Wi-Fi name (as your phone shows it, 2.4 GHz if your router has two): ").strip()
-        psk = ctx.ui.ask_secret("Wi-Fi password (not shown as you type): ")
+        # The name stays out of the log too: logs get pasted into issues (e2e run 7).
+        ssid = ctx.ui.ask("Wi-Fi name (as your phone shows it, 2.4 GHz if your router has two): ",
+                          log_answer=False).strip()
         try:
-            check_wifi(ssid, psk)
-            return ssid, psk
+            check_wifi(ssid, "x" * 8)
         except UserdataFailed as e:
             ctx.ui.say(str(e))
+            continue
+        while True:
+            # Only the password again when it's the password that's wrong (e2e run 7 asked the name too).
+            psk = ctx.ui.ask_secret("Wi-Fi password (not shown as you type): ")
+            try:
+                check_wifi(ssid, psk)
+                return ssid, psk
+            except UserdataFailed as e:
+                ctx.ui.say(str(e))
 
 
 def ask_if_ip_changed(ctx) -> None:

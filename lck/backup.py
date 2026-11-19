@@ -229,7 +229,7 @@ def restore(ctx, folder: Path, work: Path) -> None:
     commands = [f"w {n} {files[n].relative_to(work)}" for n in RESTORE_SET]
     ctx.ui.redraw()
     mtk.run_in_brom(ctx, commands, cwd=work, title="Writing the backup to the clock, about 15 minutes",
-                    prompt=BROM_AGAIN,
+                    prompt=BROM_AGAIN, held_message=mtk.NEXT_SESSION,
                     weights=[files[n].stat().st_size for n in RESTORE_SET])
     ctx.ui.say("Every partition is written.")
 

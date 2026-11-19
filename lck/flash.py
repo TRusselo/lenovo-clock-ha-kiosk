@@ -26,6 +26,7 @@ from lck.steps import Step
 from lck.ui import choose
 from lck.uvrun import uv_path, uv_python
 
+RETRIES = 3    # times fastboot is asked for again when the clock left it before the flash started
 FLASH_SET = {"boot_a", "vendor_a", "vbmeta_a", "system_a", "oem_a", "userdata", "misc"}
 WIPE_WARNING = ("This clock was already unlocked before this run: it may be converted already, or put back "
                 "to stock with lck restore, which leaves it unlocked. Flashing replaces slot A and its user "
@@ -66,42 +67,47 @@ def flash_list(folder: Path) -> list[tuple[Path, str]]:
 
 
 def fbmulti(ctx, pairs: list[tuple[Path, str]], *, title: str, sleep=time.sleep) -> None:
-    """Start fbmulti.py, ask for fastboot, and show progress until it's done."""
+    """Wait for fastboot mode for as long as it takes, then flash with fbmulti.py and show progress.
+
+    fbmulti.py gives up after 300 s without a device, which stopped setup when the person was away
+    (e2e run 7, twice). So the tool waits for the mode itself (wait_for_mode never gives up) and
+    starts fbmulti.py only once the clock is there; if it still finds no device, it waits again."""
     assert_safe(pairs)
     args = [*uv_python(uv_path(ctx), "--with", "pyusb"), fetch("fbmulti.py", ctx)]
     args += [f"{f}={p}" for f, p in pairs]
     log = work(ctx) / "fbmulti-output.txt"
     log.parent.mkdir(parents=True, exist_ok=True)
-    proc = ctx.runner.spawn(args, out_file=log)
-    try:
-        prompted = current(ctx) != Mode.FASTBOOT
-        if prompted:
-            ctx.ui.physical(FASTBOOT_PROMPT)
+    for _ in range(RETRIES):
+        if current(ctx) == Mode.FASTBOOT:
+            ctx.ui.say("The clock is in fastboot mode already: nothing to hold.")
         else:
-            ctx.ui.say("The clock is still in fastboot mode from before: nothing to hold.")
-        last = None
-        while proc.poll() is None and current(ctx) != Mode.FASTBOOT:
-            mode = current(ctx)
-            if mode.value != last:
-                ctx.ui.status(mode.value)
-                last = mode.value
-            sleep(0.25)
-        if proc.poll() is None and prompted:
-            ctx.ui.say("Found it. Let go of VOLUME UP. Leave the clock plugged in until this finishes.")
-        with ctx.ui.busy(title) as job:
-            while proc.poll() is None:
-                done = _flashed(log)
-                job.note(f"{done} of {len(pairs)}", done, len(pairs))
-                sleep(1)
-    except BaseException:
-        proc.kill()
-        ctx.runner.finished(proc)
-        raise
-    text = ctx.runner.finished(proc)
-    if proc.returncode != 0 or "ALL DONE" not in text:
-        last = [l for l in text.splitlines() if l.strip()][-1:] or ["no output"]
-        raise FlashFailed(f"Flashing stopped ({last[0].strip()}). The clock still starts its old slot. "
-                          "Unplug its power and run the same command again.")
+            wait_for_mode(Mode.FASTBOOT, ctx, prompt=FASTBOOT_PROMPT)
+        ctx.ui.say("Leave the clock plugged in until this finishes.")
+        proc = ctx.runner.spawn(args, out_file=log)
+        try:
+            with ctx.ui.busy(title) as job:
+                while proc.poll() is None:
+                    done = _flashed(log)
+                    job.note(f"{done} of {len(pairs)}", done, len(pairs))
+                    sleep(1)
+                text = ctx.runner.finished(proc)
+                if proc.returncode == 0 and "ALL DONE" in text:
+                    return
+                if "no fastboot device" in text:
+                    # Left fastboot before fbmulti.py got it: nothing was written. Wait again.
+                    job.pause("The clock left fastboot mode before anything was written")
+                    continue
+                last = [l for l in text.splitlines() if l.strip()][-1:] or ["no output"]
+                # Raised inside the job, so its line ends with a cross, not a tick (e2e run 7).
+                raise FlashFailed(f"Flashing stopped ({last[0].strip()}). The clock still starts its old slot. "
+                                  "Unplug its power and run the same command again.")
+        except BaseException:
+            if proc.poll() is None:
+                proc.kill()
+                ctx.runner.finished(proc)
+            raise
+    raise FlashFailed("The clock kept leaving fastboot mode before the flash could start. Nothing was written. "
+                      "Unplug its power and run the same command again.")
 
 
 def _flashed(log: Path) -> int:

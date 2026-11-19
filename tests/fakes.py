@@ -49,7 +49,7 @@ class FakeUI:
         self.statuses: list[str] = []
         self.answers = list(answers or [])
 
-    def say(self, text):
+    def say(self, text, log=True):
         self.lines.append(text)
 
     def physical(self, text):
@@ -103,7 +103,7 @@ class FakeUI:
         self.lines.append(f"[ask secret] {text}")
         return self.answers.pop(0) if self.answers else ""
 
-    def ask(self, text):
+    def ask(self, text, log_answer=True):
         self.lines.append(f"[ask] {text}")
         return self.answers.pop(0) if self.answers else ""
 

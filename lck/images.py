@@ -202,7 +202,8 @@ class UserdataStep(Step):
         with ctx.ui.busy("Making sparse pieces of the user data"):
             _sparse(ctx, img, "userdata", out, length)
         img.unlink()
-        ctx.ui.say("The user data holds your Wi-Fi password from the backup: the pieces stay in "
+        whose = "the Wi-Fi password you typed" if ctx.state.get("wifi_new") else "your Wi-Fi password from the backup"
+        ctx.ui.say(f"The user data holds {whose}: the pieces stay in "
                    f"{out}, keep that folder private.")
 
 
