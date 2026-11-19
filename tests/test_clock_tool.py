@@ -70,8 +70,6 @@ def test_not_a_disk_is_refused():
 # --- backup: extract and verify --------------------------------------------
 
 def _zstd_backup(tmp_path: Path) -> Path:
-    if subprocess.run(["which", "zstd"], capture_output=True).returncode:
-        pytest.skip("zstd isn't installed")
     parts = [("misc", 40, 2), ("boot_a", 42, 4), ("userdata", 46, 10)]
     raw = bytearray(make_gpt(parts))
     raw += bytes(56 * 512 - len(raw))
@@ -80,7 +78,7 @@ def _zstd_backup(tmp_path: Path) -> Path:
     folder = tmp_path / "backup" / "clock"
     folder.mkdir(parents=True)
     (folder / backup.RAW).write_bytes(bytes(raw))
-    subprocess.run(["zstd", "-q", str(folder / backup.RAW), "-o", str(folder / backup.ZST)], check=True)
+    backup.compress(folder / backup.RAW, folder / backup.ZST)     # the library: no zstd program needed
     (folder / backup.GPT_FILE).write_bytes(bytes(raw[:gpt.GPT_BYTES]))
     for n in backup.BOOT_AREAS:
         (folder / n).write_bytes(b"P" * 64)
@@ -318,8 +316,8 @@ def test_steps_are_in_the_manuals_order():
 
 
 def test_missing_linux_tools_are_named_with_their_package():
-    missing = plan.missing_tools(which=lambda t: None if t == "img2simg" else "/usr/bin/" + t)
-    assert len(missing) == 1 and "img2simg" in missing[0] and "libsparse" in missing[0]
+    missing = plan.missing_tools(which=lambda t: None if t == "debugfs" else "/usr/bin/" + t)
+    assert len(missing) == 1 and "debugfs" in missing[0] and "e2fsprogs" in missing[0]
 
 
 def test_flash_asks_first_unless_this_run_unlocked(tmp_path, monkeypatch):

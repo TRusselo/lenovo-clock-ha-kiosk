@@ -1,13 +1,15 @@
 [project]
 name = "lck"
 version = "0.1.0"
-description = "Degoogled Lenovo Smart Clock (gen 1) → Home Assistant kiosk: stock Android Things + Kiosk Satellite. Guided backup, unlock, flash, setup and restore for Linux."
+description = "Degoogled Lenovo Smart Clock (gen 1) → Home Assistant kiosk: stock Android Things + Kiosk Satellite. Guided backup, unlock, flash, setup and restore for Windows, macOS and Linux."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = [
     "pyusb>=1.2",
+    "libusb-package>=1.0.26",
     "requests>=2.31",
+    "zstandard>=0.22",
 ]
 
 [project.scripts]

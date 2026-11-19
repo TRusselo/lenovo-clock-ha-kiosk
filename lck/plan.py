@@ -5,7 +5,7 @@ from __future__ import annotations
 import shutil
 import sys
 
-from lck import backup, clock, doc, mtk
+from lck import backup, clock, doc, e2fs, mtk
 from lck.downloads import fetch, load_manifest, platform_entry, require_free_space
 from lck.flash import FlashStep, UnlockStep
 from lck.images import ImagesStep, MiscStep, UserdataStep, backup_dir, work
@@ -19,12 +19,13 @@ from lck.uvrun import uv_path
 
 NEEDED_FREE = 20 * 1024 ** 3
 # Linux tools the setup runs, and the package that has each one (Debian/Ubuntu, Arch/Fedora).
+# Only debugfs and e2fsck come from the system now (zstd and the sparse images are Python): the e2fsprogs
+# package on Linux, Homebrew's on macOS; on Windows the tool downloads them (lck/e2fs.py).
 SYSTEM_TOOLS = {
     "debugfs": "e2fsprogs",
     "e2fsck": "e2fsprogs",
-    "img2simg": "android-sdk-libsparse-utils (Debian/Ubuntu) or android-tools (Arch, Fedora)",
-    "zstd": "zstd",
 }
+GUIDE_NAMES = {"linux": "LINUX", "darwin": "MACOS", "windows": "WINDOWS"}
 
 
 class SetupFailed(Exception):
@@ -35,24 +36,24 @@ def missing_tools(which=shutil.which) -> list[str]:
     return [f"{t} (package: {p})" for t, p in SYSTEM_TOOLS.items() if not which(t)]
 
 
+def guide() -> str:
+    """This OS's guide, as a path for doc()."""
+    return f"docs/{GUIDE_NAMES.get(platform_id(), 'LINUX')}.md"
+
+
 class PrerequisitesStep(Step):
     name = "prerequisites"
     title = "Check this computer, and download the tools"
 
     def run(self, ctx) -> None:
-        if platform_id() != "linux":
-            raise SetupFailed("The clock tool runs on Linux only for now. See " + doc("docs/LINUX.md") + ".")
-        missing = missing_tools()
-        if missing:
-            raise SetupFailed("Install these first, then run the same command again: " + "; ".join(missing)
-                              + ". See " + doc("docs/LINUX.md", "step 2") + ".")
         require_free_space(ctx.paths.root, NEEDED_FREE)
         detect()                       # libusb present, before the clock is touched
         manifest = ctx.state.get("manifest") or load_manifest()
         for id_ in (f"platform-tools-{platform_id()}", platform_entry("uv", manifest, platform_arch()),
-                    "mtkclient", "cube-avb-unlock", "at_auth_unlock.py", "fbmulti.py", "sparsesplit.py",
+                    "mtkclient", "cube-avb-unlock", "at_auth_unlock.py", "fbmulti.py",
                     "simple-keyboard", "magisk"):
             fetch(id_, ctx)
+        e2fs.locate(ctx)              # Linux and macOS: installed; Windows: downloaded now
         ctx.state["tools"] = Tools.locate(ctx.paths.cache)
         uv_path(ctx)
         # Before the clock is touched, so a GitHub limit or outage can't stop the run halfway.

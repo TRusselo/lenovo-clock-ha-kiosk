@@ -51,7 +51,7 @@ The tool checks the model over Wi-Fi before it changes anything there, and refus
 - A **USB A-to-A cable**: a plug like the computer end of a normal USB cable at *both* ends, wired straight
   through, with no chip in the middle (not a "data transfer" or "bridge" cable). USB 2 or USB 3 both work
   ([what it looks like](docs/GUIDE.md#the-usb-cable))
-- A **Linux** computer with about 20 GB free (Windows and macOS aren't supported yet)
+- A Windows, macOS or Linux computer with about 20 GB free
 - Your Wi-Fi: the clock booted and connected to it (set it up with the Google Home app), or your Wi-Fi name
   and password to type into the tool. The first thing it asks is which
 - Home Assistant
@@ -59,27 +59,45 @@ The tool checks the model over Wi-Fi before it changes anything there, and refus
 
 ## Quick start
 
-You don't need to know any code. You'll type a few commands.
+You don't need a GitHub account, and you don't need to know any code. You'll type one command.
 
-**1. Get the tool.** Download this repository
-([zip](https://github.com/TRusselo/lenovo-clock-ha-kiosk/archive/refs/heads/main.zip)) and unzip it into a
-folder of its own, or `git clone` it. Your downloads and the clock's backup are saved in that folder too.
+**1. Download the program for your computer.** One click; it's always the newest version.
 
-**2. Open a terminal in that folder**, and do the one-time setup in the [Linux guide](docs/LINUX.md): a few
-packages, and USB access for the clock.
+| Your computer | Download |
+|---|---|
+| Windows 10 or 11 | [lck-windows-x86_64.zip](https://github.com/TRusselo/lenovo-clock-ha-kiosk/releases/latest/download/lck-windows-x86_64.zip) |
+| Mac with an M1 chip or newer | [lck-macos-arm64.zip](https://github.com/TRusselo/lenovo-clock-ha-kiosk/releases/latest/download/lck-macos-arm64.zip) |
+| Linux PC | [lck-linux-x86_64.zip](https://github.com/TRusselo/lenovo-clock-ha-kiosk/releases/latest/download/lck-linux-x86_64.zip) |
 
-**3. Type the command** and press Enter:
+**2. Unzip it** into a folder of its own. Your downloads and the clock's backup will be saved there too.
 
-```bash
-.venv/bin/python -m lck setup
-```
+**3. Open a terminal in that folder.** A terminal is the text window where you type commands:
+- **Windows:** open the folder, click the address bar at the top, type `cmd`, press Enter.
+- **Mac:** open Terminal, type `cd ` (with a space), drag the folder onto the window, press Return.
+- **Linux:** right-click in the folder and choose **Open Terminal Here**.
 
-**4. Do what it says.** It tells you each time it needs you: which buttons to hold on the clock, what to set up on
+**4. Type the command** and press Enter:
+- Windows: `lck\lck setup`
+- Mac: `xattr -dr com.apple.quarantine lck` first, then `./lck/lck setup`. The first command stops macOS
+  blocking the program ([more](docs/MACOS.md#if-macos-blocks-the-program)).
+- Linux: `./lck/lck setup`
+
+**5. Do what it says.** It tells you each time it needs you: which buttons to hold on the clock, what to set up on
 its screen, and when to press Enter. That's it. If it stops for any reason, type the same command again and it
 carries on where it left off.
 
 Yellow means it's your turn: something to do on the clock, or a question to answer. Red only shows when something
-went wrong. Every page, in the order you'll need them: [the guide](docs/GUIDE.md).
+went wrong.
+
+Each system has a one-time extra step: USB drivers on Windows, Homebrew's libusb and e2fsprogs on a Mac, a USB
+permission and e2fsprogs on Linux. The full guides walk you through it:
+[Windows](docs/WINDOWS.md) · [Mac](docs/MACOS.md) · [Linux](docs/LINUX.md). Every page, in the order you'll need
+them: [the guide](docs/GUIDE.md).
+
+> [!NOTE]
+> Tested end to end on **Linux**, on one clock, seven times. The Windows and Mac programs are built and their
+> tests pass on those systems, but they haven't converted a real clock yet: USB on Windows and macOS is untested.
+> If you try one, please say how it went, whether it worked or not.
 
 ### Words you'll see
 
@@ -101,7 +119,7 @@ Say how far it got, and copy the last few lines the tool printed.
 
 ### For tinkerers
 
-Do every step by hand, or point an AI agent at it: [devices/cube/README.md](devices/cube/README.md) has each step
+Run it from source with your own Python 3.10+: [docs/PYTHON.md](docs/PYTHON.md). Do every step by hand, or point an AI agent at it: [devices/cube/README.md](devices/cube/README.md) has each step
 with the check that proves it worked (agents: start with [AGENTS.md](AGENTS.md)). What was learned about the clock,
 observed versus guessed: [docs/findings/NOTES.md](docs/findings/NOTES.md).
 
@@ -125,8 +143,10 @@ Android. So the tool:
 Your Wi-Fi comes back from the backup (or the tool adds the one you type, which it never logs), and the Home
 Assistant sign-in is done **on the clock itself** or in a browser at an address the tool shows you.
 
-**To make another backup** at any time: `.venv/bin/python -m lck backup --name clock-later`.
-**To go back** to a backup, in the same folder: `.venv/bin/python -m lck restore backup/clock.zip`. It checks the
+**To make another backup** at any time, in the same folder: `lck\lck backup --name clock-later` on Windows, or
+`./lck/lck backup --name clock-later` on Mac and Linux.
+**To go back** to a backup: `lck\lck restore backup\clock.zip` on Windows, or `./lck/lck restore backup/clock.zip`
+on Mac and Linux. It checks the
 backup is from this clock, then writes it back in BROM mode. It takes about 20 minutes. A backup only restores to
 the clock it came from. The bootloader stays unlocked; stock starts fine that way. **Never use the clock's own
 factory reset to go back:** done while online, it unlinks the clock from your Google account, which no restore can

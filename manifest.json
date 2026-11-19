@@ -26,6 +26,46 @@
       "platform": "linux-aarch64"
     },
     {
+      "id": "platform-tools-windows",
+      "url": "https://dl.google.com/android/repository/platform-tools_r36.0.0-win.zip",
+      "sha256": "12c2841f354e92a0eb2fd7bf6f0f9bf8538abce7bd6b060ac8349d6f6a61107c",
+      "size": 7138784,
+      "unpack": "zip",
+      "platform": "windows"
+    },
+    {
+      "id": "platform-tools-darwin",
+      "url": "https://dl.google.com/android/repository/platform-tools_r36.0.0-darwin.zip",
+      "sha256": "d3e9fa1df3345cf728586908426615a60863d2632f73f1ce14f0f1349ef000fd",
+      "size": 14186137,
+      "unpack": "zip",
+      "platform": "darwin"
+    },
+    {
+      "id": "uv-windows-x86_64",
+      "url": "https://github.com/astral-sh/uv/releases/download/0.11.7/uv-x86_64-pc-windows-msvc.zip",
+      "sha256": "fe0c7815acf4fc45f8a5eff58ed3cf7ae2e15c3cf1dceadbd10c816ec1690cc1",
+      "size": 23572531,
+      "unpack": "zip",
+      "platform": "windows-x86_64"
+    },
+    {
+      "id": "uv-darwin-arm64",
+      "url": "https://github.com/astral-sh/uv/releases/download/0.11.7/uv-aarch64-apple-darwin.tar.gz",
+      "sha256": "66e37d91f839e12481d7b932a1eccbfe732560f42c1cfb89faddfa2454534ba8",
+      "size": 20839135,
+      "unpack": "tar.gz",
+      "platform": "darwin-arm64"
+    },
+    {
+      "id": "uv-darwin-x86_64",
+      "url": "https://github.com/astral-sh/uv/releases/download/0.11.7/uv-x86_64-apple-darwin.tar.gz",
+      "sha256": "0a4bc8fcde4974ea3560be21772aeecab600a6f43fa6e58169f9fa7b3b71d302",
+      "size": 22522163,
+      "unpack": "tar.gz",
+      "platform": "darwin-x86_64"
+    },
+    {
       "id": "mtkclient",
       "url": "https://github.com/bkerler/mtkclient/archive/cd25cf9c1ff6d36e82697ac2c798e69e9cfb78c3.zip",
       "sha256": "90af12d45023f7d8e2161910910351e2e9f2ab555401484e6f86f44fff0a21b2",
@@ -63,15 +103,6 @@
       "platform": null
     },
     {
-      "id": "sparsesplit.py",
-      "url": "https://raw.githubusercontent.com/S7ruc7ureV01d/lenovo-smart-clock-lineage/629df7e4d65501ad9f1b9906f8bbb53f55092382/tools/sparsesplit.py",
-      "sha256": "4561b06f466c9086ce961f63081a7fc42b5ccf8dbd51258a46a5b88e9c2f5dd3",
-      "size": 2093,
-      "note": "Splits a sparse image into <= 96 MiB pieces (LK's max-download-size).",
-      "unpack": null,
-      "platform": null
-    },
-    {
       "id": "magisk",
       "url": "https://github.com/topjohnwu/Magisk/releases/download/v31.1/Magisk-v31.1.apk",
       "sha256": "89cefac0a318afa39fb3880c45c87b036c05bc1ebf02a7a715b7f8d7c26ac6e7",
@@ -95,6 +126,95 @@
       "asset": "*armeabi-v7a.apk",
       "signing_cert_sha256": "2a77134ce11f65ba9d08bed669fdcb742a25633c5665a6135aeca30040b068fc",
       "note": "Newest release; check the asset digest from the release API and the signing cert. Tested: 2026.11.19 (sha256 bfaaf0d4949c0a68eec8f35c4dbb4072326f9757ff1dcb47b79d2edb61bcbd3e)."
+    },
+    {
+      "id": "cygwin-e2fsprogs",
+      "url": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/e2fsprogs/e2fsprogs-1.44.5-1.tar.xz",
+      "sha256": "0af9c38ddf8fe39d6af16fe9c3bad6a10f02b96b62e3b097d447e7ced7526f44",
+      "size": 783804,
+      "unpack": "tar.xz",
+      "platform": "windows",
+      "note": "Cygwin's e2fsprogs (GPL-2.0) and the DLLs it loads (Cygwin: LGPL-3.0), for debugfs and e2fsck on Windows. Downloaded, never bundled."
+    },
+    {
+      "id": "cygwin-runtime",
+      "url": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/cygwin/cygwin-3.6.12-1-x86_64.tar.xz",
+      "sha256": "b5115799f46d4b10864aaff7a8a1b5e3e7b1bce03727c774f94d678c8dd69275",
+      "size": 1621132,
+      "unpack": "tar.xz",
+      "platform": "windows"
+    },
+    {
+      "id": "cygwin-libuuid1",
+      "url": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/libuuid1/libuuid1-2.40.2-2.tar.xz",
+      "sha256": "8f6a8147388f37fba51f4d27b88d5d1ec97b09b2767309a27222d8b7361e10c2",
+      "size": 12532,
+      "unpack": "tar.xz",
+      "platform": "windows"
+    },
+    {
+      "id": "cygwin-libintl8",
+      "url": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gettext/libintl8/libintl8-0.26-1-x86_64.tar.xz",
+      "sha256": "a6d684c0a638b0cd8bdcb142c24c056722dd06ba7b217a584a2181ee338c3caa",
+      "size": 60324,
+      "unpack": "tar.xz",
+      "platform": "windows"
+    },
+    {
+      "id": "cygwin-libiconv2",
+      "url": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libiconv/libiconv2/libiconv2-1.19-2-x86_64.tar.xz",
+      "sha256": "c424218c7ef7d82a3481d5aa7f1f1dda8364524fb86b687871184647ec59fcbf",
+      "size": 555664,
+      "unpack": "tar.xz",
+      "platform": "windows"
+    },
+    {
+      "id": "cygwin-libgcc1",
+      "url": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/gcc/libgcc1/libgcc1-14.4.0-1-x86_64.tar.zst",
+      "sha256": "81df68770dd59e1e451d6bce1ba75c020339ce05cf262c6ea5e76aea233ef1f0",
+      "size": 59166,
+      "unpack": "tar.zst",
+      "platform": "windows"
+    },
+    {
+      "id": "cygwin-libss2",
+      "url": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/e2fsprogs/libss2/libss2-1.44.5-1.tar.xz",
+      "sha256": "b54b737b132a0d7a43b54dc1aee2ce4463b0911d1170b5d20c87408c98758ea3",
+      "size": 8132,
+      "unpack": "tar.xz",
+      "platform": "windows"
+    },
+    {
+      "id": "cygwin-libcom-err2",
+      "url": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/e2fsprogs/libcom_err2/libcom_err2-1.44.5-1.tar.xz",
+      "sha256": "ce3d6826165e61142ba2ca45318e94bfb345a814983a614f7b0b452affe80817",
+      "size": 4132,
+      "unpack": "tar.xz",
+      "platform": "windows"
+    },
+    {
+      "id": "cygwin-libext2fs2",
+      "url": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/e2fsprogs/libext2fs2/libext2fs2-1.44.5-1.tar.xz",
+      "sha256": "2ba5f23be47a9b79ac36140035487fb8e4866f379f4a291e49b240655e811a53",
+      "size": 126164,
+      "unpack": "tar.xz",
+      "platform": "windows"
+    },
+    {
+      "id": "cygwin-libe2p2",
+      "url": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/e2fsprogs/libe2p2/libe2p2-1.44.5-1.tar.xz",
+      "sha256": "8919f779cf2600fd2b490e1460f8d3f7e84da5c1d47c850d4ea183603038e5ab",
+      "size": 10024,
+      "unpack": "tar.xz",
+      "platform": "windows"
+    },
+    {
+      "id": "cygwin-libblkid1",
+      "url": "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/util-linux/libblkid1/libblkid1-2.40.2-2.tar.xz",
+      "sha256": "8f927aeb52a54ad3cf3d1acbbe0a3a691bf4fd94e781e37d0c529f9989ec7270",
+      "size": 120936,
+      "unpack": "tar.xz",
+      "platform": "windows"
     }
   ]
 }

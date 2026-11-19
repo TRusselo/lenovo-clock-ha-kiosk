@@ -19,7 +19,7 @@ class FakeRunner:
         self.calls: list[list[str]] = []
         self.envs: list[dict | None] = []
 
-    def run(self, args, *, check=True, timeout=60, env=None, log_output=True):
+    def run(self, args, *, check=True, timeout=60, env=None, log_output=True, cwd=None):
         args = [str(a) for a in args]
         self.calls.append(args)
         self.envs.append(env)

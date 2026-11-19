@@ -2,7 +2,7 @@
 
 The backup is the clock's whole eMMC user area (every partition, userdata
 included: the setup rebuilds the clock from it), plus the two boot areas
-(the preloader). It's compressed with zstd, about 0.7 GB, and packed with its
+(the preloader). It's compressed with zstd (the library, not the program), about 0.7 GB, and packed with its
 checksums into one zip. It holds data unique to that clock, and the Wi-Fi
 password saved on it: it must never be shared.
 
@@ -85,17 +85,53 @@ def verify_backup(folder: Path) -> list[str]:
     return problems
 
 
+# zstd through the Python library, the same on every OS (no zstd program needed). The window
+# matches `zstd --long=27`, which made the backups taken before this.
+WINDOW_LOG = 27
+
+
+def zst_reader(path: Path):
+    """A stream of the decompressed image."""
+    import zstandard
+    return zstandard.ZstdDecompressor(max_window_size=1 << WINDOW_LOG).stream_reader(open(path, "rb"),
+                                                                                   closefd=True)
+
+
+def compress(src: Path, dest: Path, job=None) -> None:
+    """`zstd -10 --long=27`, as a library call, with progress."""
+    import zstandard
+    params = zstandard.ZstdCompressionParameters.from_level(10, window_log=WINDOW_LOG, enable_ldm=True,
+                                                            threads=-1)
+    total = Path(src).stat().st_size
+    part = Path(dest).with_name(Path(dest).name + ".part")
+    with open(src, "rb") as fin, open(part, "wb") as fout:
+        with zstandard.ZstdCompressor(compression_params=params).stream_writer(fout, size=total,
+                                                                             closefd=False) as w:
+            done = 0
+            for chunk in iter(lambda: fin.read(CHUNK), b""):
+                w.write(chunk)
+                done += len(chunk)
+                if job is not None:
+                    job.note(f"{done >> 20} of {total >> 20} MB", done, total)
+    os.replace(part, dest)
+
+
+def zst_sha256(path: Path) -> str:
+    """The SHA-256 of the decompressed image: checks the compressed copy reads back whole."""
+    h = hashlib.sha256()
+    with zst_reader(path) as r:
+        for chunk in iter(lambda: r.read(CHUNK), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def head_of(folder: Path) -> bytes:
     """The backup's partition table (gpt.bin, or the start of the compressed image)."""
     f = Path(folder) / GPT_FILE
     if f.exists():
         return f.read_bytes()
-    p = subprocess.Popen(["zstd", "-dc", "--long=27", str(Path(folder) / ZST)], stdout=subprocess.PIPE,
-                         stderr=subprocess.DEVNULL)
-    data = p.stdout.read(gpt.GPT_BYTES)
-    p.kill()
-    p.wait()
-    return data
+    with zst_reader(Path(folder) / ZST) as r:
+        return r.read(gpt.GPT_BYTES)
 
 
 def backup(ctx, out: Path) -> None:
@@ -120,9 +156,11 @@ def backup(ctx, out: Path) -> None:
     (out / GPT_FILE).write_bytes(head)
     with ctx.ui.busy("Checking the backup"):
         sums = {RAW: sha256(raw)}
-    with ctx.ui.busy(f"Compressing the backup ({raw.stat().st_size >> 30} GB to about 0.7 GB)"):
-        ctx.runner.run(["zstd", "-q", "-f", "-T0", "-10", "--long=27", raw, "-o", out / ZST], timeout=3 * 3600)
-        ctx.runner.run(["zstd", "-q", "-t", "--long=27", out / ZST], timeout=3600)
+    with ctx.ui.busy(f"Compressing the backup ({raw.stat().st_size >> 30} GB to about 0.7 GB)") as job:
+        compress(raw, out / ZST, job)
+    with ctx.ui.busy("Checking the compressed backup reads back"):
+        if zst_sha256(out / ZST) != sums[RAW]:
+            raise BackupMismatch("The compressed backup doesn't read back the same. Run the same command again.")
     for name in [ZST, GPT_FILE, *BOOT_AREAS]:
         sums[name] = sha256(out / name)
     (out / SUMS).write_text("".join(f"{d}  {n}\n" for n, d in sums.items()), encoding="utf-8")
@@ -165,14 +203,13 @@ def extract(ctx, folder: Path, names: list[str], dest: Path) -> dict[str, Path]:
     end = wanted[-1].offset + wanted[-1].size
     total = max(p.offset + p.size for p in table.values())
     h = hashlib.sha256()
-    proc = subprocess.Popen(["zstd", "-dc", "--long=27", str(folder / ZST)], stdout=subprocess.PIPE,
-                            stderr=subprocess.DEVNULL)
+    reader = zst_reader(folder / ZST)
     pos = 0
     with ctx.ui.busy("Unpacking the backup") as job:
         outs = {p.name: open(files[p.name], "wb") for p in wanted}
         try:
             while True:
-                chunk = proc.stdout.read(CHUNK)
+                chunk = reader.read(CHUNK)
                 if not chunk:
                     break
                 h.update(chunk)
@@ -185,7 +222,7 @@ def extract(ctx, folder: Path, names: list[str], dest: Path) -> dict[str, Path]:
         finally:
             for f in outs.values():
                 f.close()
-            proc.wait()
+            reader.close()
     if pos < end:
         raise BackupMismatch("The backup image is cut short.")
     if sums.get(RAW) and h.hexdigest() != sums[RAW]:

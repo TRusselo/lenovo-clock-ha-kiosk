@@ -30,11 +30,25 @@ SYS_CTX = "u:object_r:system_data_file:s0"
 ADBKEY_CTX = "u:object_r:adb_keys_file:s0"
 
 
+# debugfs and e2fsck: names on Linux, full paths elsewhere (lck/e2fs.py sets these). Every call runs
+# in the image's own folder with relative file names: Windows' debugfs (Cygwin) reads its own command
+# lines, where a path like C:\Users\Some One\... would break.
+DEBUGFS = "debugfs"
+E2FSCK = "e2fsck"
+ENV = None
+
+
+def _run(img, args, text=False):
+    folder, name = os.path.split(os.path.abspath(img))
+    return subprocess.run([DEBUGFS, *args, name], cwd=folder, capture_output=True, text=text, env=ENV)
+
+
 def dbg(img, cmds):
-    with tempfile.NamedTemporaryFile("w", suffix=".debugfs", delete=False) as f:
+    folder = os.path.dirname(os.path.abspath(img))
+    with tempfile.NamedTemporaryFile("w", suffix=".debugfs", delete=False, dir=folder, newline="\n") as f:
         f.write("\n".join(cmds) + "\n")
         path = f.name
-    r = subprocess.run(["debugfs", "-w", "-f", path, img], capture_output=True, text=True)
+    r = _run(img, ["-w", "-f", os.path.basename(path)], text=True)
     os.unlink(path)
     err = [l for l in r.stderr.splitlines() if l and not l.startswith("debugfs ")]
     if err:
@@ -43,26 +57,35 @@ def dbg(img, cmds):
 
 
 def cat(img, path):
-    return subprocess.run(["debugfs", "-R", f"cat {path}", img],
-                          capture_output=True).stdout
+    return _run(img, ["-R", f"cat {path}"]).stdout
+
+
+def exists(img, path) -> bool:
+    return _run(img, ["-R", f"stat {path}"], text=True).stdout.startswith("Inode:")
 
 
 def put(img, tmp, path, data, uid, gid, mode, ctx):
+    """tmp: a folder inside the image's own folder (see _scratch)."""
+    folder = os.path.dirname(os.path.abspath(img))
     local = os.path.join(tmp, os.path.basename(path))
     open(local, "wb").write(data)
     ctxf = local + ".ctx"
     open(ctxf, "wb").write(ctx.encode() + b"\0")  # stock labels are NUL-terminated
-    exists = subprocess.run(["debugfs", "-R", f"stat {path}", img],
-                            capture_output=True, text=True).stdout.startswith("Inode:")
-    if exists:
+    rel, relctx = (os.path.relpath(x, folder).replace(os.sep, "/") for x in (local, ctxf))
+    if exists(img, path):
         dbg(img, [f"rm {path}"])
     dbg(img, [
-        f"write {local} {path}",
+        f"write {rel} {path}",
         f"set_inode_field {path} uid {uid}",
         f"set_inode_field {path} gid {gid}",
         f"set_inode_field {path} mode 0{0o100000 | mode:o}",
-        f"ea_set -f {ctxf} {path} security.selinux",
+        f"ea_set -f {relctx} {path} security.selinux",
     ])
+
+
+def _scratch(img):
+    """A temporary folder next to the image, so debugfs gets short relative names."""
+    return tempfile.TemporaryDirectory(dir=os.path.dirname(os.path.abspath(img)), prefix="dbg-")
 
 
 def inject(img: str, pub: str, runner=None) -> None:
@@ -71,7 +94,7 @@ def inject(img: str, pub: str, runner=None) -> None:
     key = open(pub, "rb").read()
     if not key.startswith(b"QAAAA"):
         raise UserdataFailed(f"{pub} isn't an adb public key (adbkey.pub).")
-    with tempfile.TemporaryDirectory() as tmp:
+    with _scratch(img) as tmp:
         sg = cat(img, "/system/users/0/settings_global.xml").decode()
         new, n = re.subn(r'(name="adb_enabled" value=")[01](")', r"\g<1>1\2", sg)
         if n != 1:
@@ -185,16 +208,14 @@ def add_wifi(img: str, ssid: str, psk: str) -> None:
     ents = {'"': "&quot;", "'": "&apos;"}
     entry = NETWORK.format(key=escape(f'"{ssid}"WPA_PSK', ents), ssid=escape(f'"{ssid}"', ents),
                            psk=escape(f'"{psk}"', ents))
-    exists = subprocess.run(["debugfs", "-R", "stat /misc/wifi", img], capture_output=True,
-                            text=True).stdout.startswith("Inode:")
-    if not exists:
+    if not exists(img, "/misc/wifi"):
         raise UserdataFailed("This user data has no /misc/wifi folder, so the tool can't add a network to it. "
                              "Set the clock up on your Wi-Fi with the Google Home app instead.")
     xml = cat(img, WIFI_STORE).decode("utf-8", "replace") or EMPTY_STORE
     if "</NetworkList>" not in xml:
         xml = EMPTY_STORE
     xml = xml.replace("</NetworkList>", entry + "</NetworkList>", 1)
-    with tempfile.TemporaryDirectory() as tmp:
+    with _scratch(img) as tmp:
         put(img, tmp, WIFI_STORE, xml.encode(), 1000, 1000, 0o600, WIFI_CTX)
 
 

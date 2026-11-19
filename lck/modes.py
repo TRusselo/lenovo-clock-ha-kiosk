@@ -9,7 +9,9 @@ devices on this computer are never touched.
 from __future__ import annotations
 
 import os
+import shutil
 import sys
+from pathlib import Path
 import time
 from enum import Enum
 
@@ -57,11 +59,11 @@ class UsbNoPermission(Exception):
     pass
 
 
-LIBUSB_MISSING = ("This needs libusb, which couldn't be loaded. Install libusb-1.0 with your package "
-                  "manager (for example: sudo apt install libusb-1.0-0), then run the same command again. "
-                  "See " + doc("docs/LINUX.md") + ".")
+LIBUSB_MISSING = ("This needs libusb, which couldn't be loaded. On Linux, install libusb-1.0 with your package "
+                  "manager (for example: sudo apt install libusb-1.0-0). On a Mac: brew install libusb. Then run "
+                  "the same command again. See " + doc("docs/GUIDE.md", "Before you start") + ".")
 NO_PERMISSION = ("The clock is connected, but this computer account isn't allowed to use it. Do the "
-                 "one-time USB access setup in " + doc("docs/LINUX.md", "step 3") + ", then unplug the "
+                 "one-time USB access setup in " + doc("docs/drivers.md", "Linux") + ", then unplug the "
                  "clock's power and run the same command again.")
 
 
@@ -72,11 +74,54 @@ def usb_access(bus: int, address: int) -> bool:
     return os.access(f"/dev/bus/usb/{bus:03d}/{address:03d}", os.R_OK | os.W_OK)
 
 
+def _usb_backend():
+    """libusb from the libusb-package wheel (it brings the library on Windows and macOS), else the
+    system's. As the Smart Display tool does."""
+    try:
+        import libusb_package
+        return libusb_package.get_libusb1_backend()
+    except Exception:
+        return None
+
+
+def libusb_dir():
+    """The folder of the libusb library this tool brings, or None."""
+    try:
+        import libusb_package
+        path = libusb_package.get_library_path()
+        return Path(str(path)).parent if path else None
+    except Exception:
+        return None
+
+
+def helper_env(cache) -> dict:
+    """The environment for the helpers run through uv (mtkclient, fbmulti.py), which load libusb
+    with pyusb on their own: on Windows and macOS they find this tool's copy.
+    mtkclient at the pinned commit loads "libusb-1.0.dll" on Windows and "libusb-1.0.so" on macOS
+    too, so on macOS a copy under that name sits next to the real one."""
+    env = dict(os.environ)
+    folder = libusb_dir()
+    if folder is None or sys.platform.startswith("linux"):
+        return env
+    if sys.platform == "darwin":
+        own = Path(cache) / "libusb"
+        own.mkdir(parents=True, exist_ok=True)
+        for lib in folder.glob("libusb-1.0*.dylib"):
+            for name in (lib.name, "libusb-1.0.dylib", "libusb-1.0.so"):
+                if not (own / name).exists():
+                    shutil.copy2(lib, own / name)
+        env["DYLD_FALLBACK_LIBRARY_PATH"] = os.pathsep.join(
+            [str(own), env.get("DYLD_FALLBACK_LIBRARY_PATH", ""), "/opt/homebrew/lib", "/usr/local/lib", "/usr/lib"])
+        return env
+    env["PATH"] = os.pathsep.join([str(folder), env.get("PATH", "")])
+    return env
+
+
 def usb_scan() -> list[tuple[Mode, int, int]]:
     """Every clock-mode USB device: (mode, bus, address)."""
     try:
         import usb.core
-        devs = list(usb.core.find(find_all=True))
+        devs = list(usb.core.find(find_all=True, backend=_usb_backend()))
     except Exception as e:  # usb.core.NoBackendError and import errors
         if type(e).__name__ == "NoBackendError" or isinstance(e, ImportError):
             raise UsbBackendMissing(LIBUSB_MISSING) from e

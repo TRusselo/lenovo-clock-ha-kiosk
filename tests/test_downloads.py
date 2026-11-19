@@ -124,7 +124,9 @@ def test_cache_path_with_spaces(tmp_path, server):
 def test_repo_manifest_is_complete():
     m = load_manifest()
     for id_ in ("platform-tools-linux", "uv-linux-x86_64", "mtkclient", "cube-avb-unlock",
-                "at_auth_unlock.py", "fbmulti.py", "sparsesplit.py", "magisk", "simple-keyboard"):
+                "at_auth_unlock.py", "fbmulti.py", "magisk", "simple-keyboard", "platform-tools-windows",
+                "platform-tools-darwin", "uv-windows-x86_64", "uv-darwin-arm64", "cygwin-e2fsprogs",
+                "cygwin-runtime"):
         e = m[id_]
         assert len(e["sha256"]) == 64 and e["size"] > 0 and e["url"].startswith("https://")
 

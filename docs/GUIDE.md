@@ -7,7 +7,7 @@ Every page in one place, in the order you'll need them.
 ```text
  Your computer                     The clock
  -------------                     ---------
- 1. Get the tool, Linux guide
+ 1. Download and unzip lck
  2. Run: lck setup
        |
        |-- backup -------------->  BROM mode (screen dark)
@@ -42,7 +42,11 @@ highlighted. Under it, the job in progress counts up, such as "37%" for the back
 
 ## Before you start
 
-- [Linux](LINUX.md): packages, USB access, and running the tool. Windows and macOS aren't supported yet.
+Pick the guide for your computer:
+- [Windows](WINDOWS.md), with [USB drivers](drivers.md)
+- [Mac](MACOS.md) (Apple silicon)
+- [Linux](LINUX.md)
+- [Running from source](PYTHON.md): any computer with Python 3.10 or newer, including Intel Macs
 
 New to this? [Words you'll see](../README.md#words-youll-see) explains the terms.
 

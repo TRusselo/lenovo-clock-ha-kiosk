@@ -28,12 +28,12 @@ class RealRunner:
     def __init__(self, logger=None):
         self.logger = logger
 
-    def run(self, args, *, check=True, timeout=60, env=None, log_output=True) -> Result:
+    def run(self, args, *, check=True, timeout=60, env=None, log_output=True, cwd=None) -> Result:
         argv = [str(a) for a in args]
         if self.logger:
             self.logger.info("$ %s", " ".join(argv))
         p = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                           stdin=subprocess.DEVNULL, timeout=timeout, env=env)
+                           stdin=subprocess.DEVNULL, timeout=timeout, env=env, cwd=cwd)
         result = Result(p.returncode, p.stdout.decode("utf-8", "replace"))
         if self.logger:
             shown = result.out.strip()[-4000:] if log_output else "(output not logged)"
@@ -52,8 +52,12 @@ class RealRunner:
         f = open(out_file, "wb")
         # Its own session: a Ctrl-C in the terminal (often meant as copy) reaches only this tool,
         # which asks before stopping, instead of killing a 35-minute backup outright (e2e run 6).
+        # (start_new_session does nothing for this on Windows, where a console Ctrl-C reaches every
+        # process on the console unless it's in its own process group.)
+        extra = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform.startswith("win")
+                 else {"start_new_session": True})
         p = subprocess.Popen(argv, stdout=f, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                             cwd=cwd, env=env, start_new_session=True)
+                             cwd=cwd, env=env, **extra)
         p.out_file = f
         return p
 

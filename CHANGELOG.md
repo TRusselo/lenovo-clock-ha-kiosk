@@ -4,6 +4,15 @@ What changed for people converting a clock. Newest first.
 
 ## Unreleased
 
+### Windows and macOS
+- **Ready-made programs for Windows, macOS (Apple silicon) and Linux**, built by GitHub Actions on a version tag,
+  like the Smart Display's: download a zip, unzip, run `lck setup`. Guides for each:
+  [Windows](docs/WINDOWS.md) (with [USB drivers](docs/drivers.md)), [Mac](docs/MACOS.md), [Linux](docs/LINUX.md),
+  and [from source](docs/PYTHON.md). Tested on hardware on Linux only so far.
+- **No more Linux-only tools:** zstd and the sparse images for fastboot are now Python (the images still come out
+  the same: checked against the ones the clock booted). e2fsprogs comes from the system on Linux, from Homebrew on
+  a Mac, and on Windows the tool downloads Cygwin's build, pinned by checksum.
+- **USB** uses the libusb the tool brings (from the libusb-package wheel), on every system.
 - **The dashboard has its own home:** [lenovo-clock-dashboard](https://github.com/TRusselo/lenovo-clock-dashboard), installed with HACS. Its copy in this repo
   is gone, so there's one place to get it and ask about it.
 ### Fixes from the seventh end-to-end run

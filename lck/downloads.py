@@ -107,9 +107,16 @@ def _unpack(kind: str, archive: Path, out: Path) -> None:
         import py7zr
         with py7zr.SevenZipFile(archive) as z:
             z.extractall(tmp)
-    elif kind == "tar.gz":
+    elif kind in ("tar.gz", "tar.xz", "tar.zst"):
+        import io
         import tarfile
-        with tarfile.open(archive, "r:gz") as t:
+        if kind == "tar.zst":
+            import zstandard
+            data = io.BytesIO(zstandard.ZstdDecompressor().stream_reader(open(archive, "rb")).read())
+            opened = tarfile.open(fileobj=data, mode="r:")
+        else:
+            opened = tarfile.open(archive, "r:gz" if kind == "tar.gz" else "r:xz")
+        with opened as t:
             if hasattr(tarfile, "data_filter"):
                 t.extractall(tmp, filter="data")
             else:  # Python 3.10 before 3.10.12 has no extraction filters: check by hand.

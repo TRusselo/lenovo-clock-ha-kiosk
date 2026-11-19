@@ -45,9 +45,17 @@ def _parts(ctx) -> dict[str, Path]:
     return backup.extract(ctx, folder, NEEDED, work(ctx) / "parts")
 
 
+def e2fs_ready(ctx) -> None:
+    """debugfs and e2fsck located for this OS (a resumed run skips the prerequisites step)."""
+    if not ctx.state.get("e2fs"):
+        from lck import e2fs
+        e2fs.locate(ctx)
+        ctx.state["e2fs"] = True
+
+
 def _debugfs_cat(ctx, image: Path, path: str) -> str:
-    r = ctx.runner.run(["debugfs", "-R", f"cat {path}", image], check=False, timeout=120, log_output=False)
-    return r.out
+    e2fs_ready(ctx)
+    return userdata.cat(str(image), path).decode("utf-8", "replace")
 
 
 def build_id(ctx, system_img: Path) -> str:
@@ -70,20 +78,40 @@ def is_empty(path: Path, probe: int = 1 << 20) -> bool:
 
 
 def _sparse(ctx, raw: Path, name: str, out: Path, limit: int) -> list[Path]:
-    simg = out / f"{name}.simg"
-    ctx.runner.run(["img2simg", raw, simg], timeout=1800)
+    """Sparse pieces of `raw` for LK's fastboot, written in Python (lck/sparse.py): no img2simg or
+    sparsesplit.py, so it works the same on Windows and macOS. Only whole 4 KiB blocks are written."""
     for old in out.glob(f"{name}_chunk.*"):
         old.unlink()
-    ctx.runner.run([*_python(ctx), fetch("sparsesplit.py", ctx), simg, out / f"{name}_chunk", PIECE],
-                   timeout=1800)
-    simg.unlink()
-    pieces = sorted(out.glob(f"{name}_chunk.*"), key=lambda p: int(p.suffix[1:]))
+    blocks = sparse.whole_blocks(min(Path(raw).stat().st_size, limit)) // sparse.BLOCK
+    pieces = [Path(p) for p in sparse.write_pieces(str(raw), str(out / f"{name}_chunk"), PIECE, blocks)]
     for p in pieces:
         with open(p, "rb") as f:
             head = f.read(sparse.HEADER.size)
         if not sparse.fits(head, limit):
             raise ImagesFailed(f"{p.name} would write past the end of its partition. Nothing was flashed.")
     return pieces
+
+
+def e2fsck(ctx, image: Path, flag: str):
+    """e2fsck -fy (repair, replaying the journal) or -fn (check only), run in the image's folder with a
+    relative name, as debugfs is (lck/userdata.py)."""
+    e2fs_ready(ctx)
+    image = Path(image).resolve()
+    return ctx.runner.run([userdata.E2FSCK, flag, image.name], check=False, timeout=1800, cwd=image.parent,
+                          env=userdata.ENV)
+
+
+def copy_sparse(src: Path, dest: Path) -> None:
+    """Copy an image, leaving zero blocks as holes where the file system allows (cp --sparse=always,
+    in Python): the 5 GB user data is mostly empty."""
+    zero = bytes(1 << 20)
+    with open(src, "rb") as fin, open(dest, "wb") as fout:
+        for chunk in iter(lambda: fin.read(1 << 20), b""):
+            if chunk == zero[:len(chunk)]:
+                fout.seek(len(chunk), 1)
+            else:
+                fout.write(chunk)
+        fout.truncate()
 
 
 def _python(ctx) -> list:
@@ -108,7 +136,7 @@ class ImagesStep(Step):
         with ctx.ui.busy("Finding the stock build that matches the user data"):
             ud = work(ctx) / "userdata_check.img"
             shutil.copyfile(parts["userdata"], ud)
-            ctx.runner.run(["e2fsck", "-fy", ud], check=False, timeout=1800)
+            e2fsck(ctx, ud, "-fy")
             wanted = userdata_build(ctx, ud)
             ud.unlink()
             builds = {s: build_id(ctx, parts[f"system_{s}"]) for s in "ab"}
@@ -153,8 +181,9 @@ def ensure_wifi(ctx) -> None:
         part = backup.extract(ctx, folder, ["userdata"], work(ctx) / "parts")["userdata"]
         if is_empty(part):
             return                    # wiped by an unlock: the images step explains that
-        ctx.runner.run(["cp", "--sparse=always", part, probe], timeout=1800)
-        ctx.runner.run(["e2fsck", "-fy", probe], check=False, timeout=1800)
+        copy_sparse(part, probe)
+        e2fsck(ctx, probe, "-fy")
+        e2fs_ready(ctx)
         count = userdata.wifi_networks(str(probe))
         probe.unlink(missing_ok=True)
     ctx.state["wifi_checked"] = True
@@ -185,8 +214,8 @@ class UserdataStep(Step):
             raise ImagesFailed(f"No adb key at {key}. Run: adb keygen ~/.android/adbkey, then the same "
                                "command again.")
         with ctx.ui.busy("Editing a copy of the user data"):
-            ctx.runner.run(["cp", "--sparse=always", parts["userdata"], img], timeout=1800)
-            r = ctx.runner.run(["e2fsck", "-fy", img], check=False, timeout=1800)
+            copy_sparse(parts["userdata"], img)
+            r = e2fsck(ctx, img, "-fy")
             if r.code not in (0, 1):
                 raise ImagesFailed("The backup's user data has file system errors e2fsck can't fix.")
             userdata.inject(str(img), str(key), runner=ctx.runner)
@@ -197,7 +226,7 @@ class UserdataStep(Step):
                 ctx.ui.say(f"Added the Wi-Fi network {ssid} to the clock's user data.", log=False)
             with open(img, "r+b") as f:
                 f.truncate(sparse.whole_blocks(length))
-            r = ctx.runner.run(["e2fsck", "-fn", img], check=False, timeout=1800)
+            r = e2fsck(ctx, img, "-fn")
             if r.code != 0:
                 raise ImagesFailed("The edited user data didn't pass its check. Nothing was flashed.")
         with ctx.ui.busy("Making sparse pieces of the user data"):

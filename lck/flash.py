@@ -20,7 +20,7 @@ from pathlib import Path
 from lck import clock
 from lck.downloads import fetch
 from lck.images import work
-from lck.modes import FASTBOOT_PROMPT, POWER_CYCLE, Mode, current, stuck_hint, wait_for_mode, wait_to_leave
+from lck.modes import helper_env, FASTBOOT_PROMPT, POWER_CYCLE, Mode, current, stuck_hint, wait_for_mode, wait_to_leave
 from lck.runner import Result
 from lck.steps import Step
 from lck.ui import choose
@@ -84,7 +84,7 @@ def fbmulti(ctx, pairs: list[tuple[Path, str]], *, title: str, sleep=time.sleep)
         else:
             wait_for_mode(Mode.FASTBOOT, ctx, prompt=FASTBOOT_PROMPT)
         ctx.ui.say("Leave the clock plugged in until this finishes.")
-        proc = ctx.runner.spawn(args, out_file=log)
+        proc = ctx.runner.spawn(args, out_file=log, env=helper_env(ctx.paths.cache))
         try:
             with ctx.ui.busy(title) as job:
                 gone = 0

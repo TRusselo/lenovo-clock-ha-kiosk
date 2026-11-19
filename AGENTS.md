@@ -4,7 +4,7 @@
 
 You're probably helping someone convert a Lenovo Smart Clock gen 1 (CD-24501F, "cube").
 
-- **Prefer the tool.** `.venv/bin/python -m lck setup` checks every step. Run it, and relay its physical prompts
+- **Prefer the tool.** `lck setup` (the ready-made program) or `python -m lck setup` (from source) checks every step. Run it, and relay its physical prompts
   word for word: the person has to hold the buttons.
 - **By hand:** follow [devices/cube/README.md](devices/cube/README.md) in order. **Run each step's Check and read
   its output before going on.** If a Check fails, stop and tell the person. Don't improvise.
@@ -39,6 +39,9 @@ You're probably helping someone convert a Lenovo Smart Clock gen 1 (CD-24501F, "
 - **Layout:** Python package in `lck/`, one module per concern, built on the Smart Display tool's (`lhk`) screen,
   steps, log and downloads, so the two look and feel the same; tests in `tests/`, which use fakes and never need
   hardware or network.
+- **Cross-platform:** no Linux-only programs. zstd is the `zstandard` library, sparse images are `lck/sparse.py`,
+  e2fsprogs is located or downloaded per OS by `lck/e2fs.py`, and debugfs/e2fsck run in the image's folder with
+  relative names (Cygwin's debugfs on Windows can't take `C:\...` paths with spaces).
 - **Every external command** goes through `ctx.runner`. Every mtkclient command goes through `mtk.assert_safe`,
   every flash through `flash.assert_safe`.
 - **TDD:** write the failing test first.

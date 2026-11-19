@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 from lck.downloads import fetch
-from lck.modes import (BROM_PROMPT, HINT_AFTER, NOTHING_HINT, PRELOADER_HINT, STARTED_AFTER, Mode,
+from lck.modes import (helper_env, BROM_PROMPT, HINT_AFTER, NOTHING_HINT, PRELOADER_HINT, STARTED_AFTER, Mode,
                        UsbNoPermission, current)
 from lck.uvrun import uv_path, uv_python
 
@@ -139,7 +139,7 @@ def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str 
         # this time to write" a second time (review of the run 7 fixes).
         steps = BROM_PROMPT if unplugged and message is not STALE else prompt
         log = cwd / "mtk-output.txt"
-        proc = ctx.runner.spawn(args, out_file=log, cwd=cwd)
+        proc = ctx.runner.spawn(args, out_file=log, cwd=cwd, env=helper_env(ctx.paths.cache))
         try:
             ctx.ui.physical(steps)
             ctx.ui.status("waiting for BROM")
