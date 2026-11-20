@@ -4,6 +4,18 @@ What changed for people converting a clock. Newest first.
 
 ## Unreleased
 
+### Windows: BROM mode (issue 1)
+- **UsbDk is checked before BROM mode,** at the start of setup and before every backup or restore. Without it,
+  Windows shows the clock in BROM mode but can't open it, and the clock started normally after a few seconds with
+  no word why. The tool now stops first, with the install steps. `LCK_SKIP_USBDK_CHECK=1` skips the check.
+- **"Windows couldn't open the clock in BROM mode"** when mtkclient reports exactly that, instead of waiting; and
+  "mtkclient hasn't connected" if BROM showed and nothing happened for 10 seconds, instead of "Nothing yet".
+- **Connected means connected:** mtkclient's own handshake counts, not only the USB watcher, so a backup or
+  restore under way never gets the "unplug it" hint.
+- **The log says more:** lck's version and the OS on every run, whether UsbDk was found, why mtkclient couldn't
+  open USB (it hid that), all of mtkclient's output (one line per progress bar), and on Windows the MediaTek USB
+  devices with their drivers.
+
 ### Windows and macOS
 - **Ready-made programs for Windows, macOS (Apple silicon) and Linux**, built by GitHub Actions on a version tag,
   like the Smart Display's: download a zip, unzip, run `lck setup`. Guides for each:

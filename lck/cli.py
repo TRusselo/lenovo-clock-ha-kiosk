@@ -58,6 +58,7 @@ def _context(args) -> Context:
     paths = Paths(args.workdir)
     logger = log.setup(paths.logs / f"{args.name}.log")
     logger.info("%s %s", RUN_MARK, " ".join(sys.argv[1:]) or args.command)
+    logger.info("%s", about_this_computer())
     ctx = Context(runner=RealRunner(logger=logger), ui=UI(logger=logger), paths=paths,
                   state={"progress_id": args.name, "log": logger})
     if getattr(args, "ip", None):
@@ -67,6 +68,14 @@ def _context(args) -> Context:
 
 
 RUN_MARK = "=== lck run:"
+
+
+def about_this_computer() -> str:
+    """The first line of every run in the log, for a report: lck's version, the OS and its version."""
+    import platform
+    build = "program" if getattr(sys, "frozen", False) else "from source"
+    return (f"lck {__version__} ({build}) on {platform.platform()} {platform.machine()}, "
+            f"Python {platform.python_version()}")
 
 
 def _selfcheck(args) -> int:

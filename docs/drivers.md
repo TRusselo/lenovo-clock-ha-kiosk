@@ -19,6 +19,18 @@ Windows. BROM lasts only a few seconds, too short to attach a driver by hand, an
 1. Download the 64-bit `.msi` from [UsbDk's releases](https://github.com/daynix/UsbDk/releases) and install it.
 2. Restart Windows if it asks.
 
+The tool checks for UsbDk before it asks for BROM mode, and stops with these steps if it's missing. Without it,
+Windows still shows the clock in BROM mode ("Clock mode: BROM"), but nothing can open it: after a few seconds the
+clock gives up and starts normally. If the tool says UsbDk isn't working although it's installed, install it again
+and restart Windows. If the check can't see a UsbDk that's there, `set LCK_SKIP_USBDK_CHECK=1` in the command
+window skips it.
+
+**If BROM still doesn't connect,** please open an issue with the log (`logs\clock.log` in the tool's folder). It
+records the tool's version and Windows', whether UsbDk was found, mtkclient's whole output, and what Windows knows
+about the clock's MediaTek USB device (from `pnputil /enum-devices /ids`), including its driver. Device Manager
+shows the same thing: in BROM mode the clock is a MediaTek device (USB ID `0E8D 0003`), often a **USB Serial
+Device (COM…)** under **Ports**.
+
 **Fastboot (unlocking and flashing): Google's USB driver.** The clock stays in fastboot mode until it's unplugged,
 so there's time to attach it. Windows doesn't know the clock's fastboot ID, so the driver is picked by hand:
 1. Download the [Google USB Driver](https://developer.android.com/studio/run/win-usb) and unzip it.

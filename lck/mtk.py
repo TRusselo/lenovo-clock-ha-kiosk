@@ -14,6 +14,7 @@ import re
 import time
 from pathlib import Path
 
+from lck import windrivers
 from lck.downloads import fetch
 from lck.modes import (helper_env, BROM_PROMPT, HINT_AFTER, NOTHING_HINT, PRELOADER_HINT, STARTED_AFTER, Mode,
                        UsbNoPermission, current)
@@ -29,6 +30,78 @@ READS = {"rf", "ro", "r", "printgpt"}
 NEVER_WRITE = {"preloader", "proinfo", "nvram", "seccfg", "lk_a", "lk_b", "tee_a", "tee_b",
                "oem_bootloader_a", "oem_bootloader_b", "kb", "dkb"}
 _PROGRESS = re.compile(r"(\d+(?:\.\d+)?)% (?:Read|Write)")
+
+# mtkclient (fetched, not ours to edit) swallows the reason it can't open the clock's USB device: its
+# handshake loop logs it at debug level only (issue 1: Windows, no UsbDk, nothing said). This runs it
+# unchanged, and prints, each once, with "[lck]" in front: why opening USB failed, whether libusb uses
+# UsbDk (Windows), and when the handshake with BROM worked.
+MARK = "[lck] "
+CONNECTED = MARK + "connected to the clock in BROM mode"
+OPEN_FAILED = MARK + "USB open failed: "
+MTK_SHIM = """import os, runpy, sys
+script = sys.argv[1]
+sys.argv = sys.argv[1:]
+sys.path.insert(0, os.path.dirname(os.path.abspath(script)))
+def say(text):
+    print("[lck] " + text, flush=True)
+say("mtkclient on " + sys.platform + ", Python " + sys.version.split()[0])
+try:
+    from mtkclient.Library.Connection import usblib
+    from mtkclient.Library import Port as port
+except Exception as e:
+    say("can't watch mtkclient's USB connection: %r" % (e,))
+else:
+    seen = set()
+    _connect = usblib.UsbClass.connect
+    def connect(self, *a, **k):
+        try:
+            return _connect(self, *a, **k)
+        except Exception as e:
+            msg = type(e).__name__ + ": " + str(e)
+            if msg not in seen:
+                seen.add(msg)
+                say("USB open failed: " + msg)
+            raise
+    usblib.UsbClass.connect = connect
+    _init = usblib.UsbClass.__init__
+    def init(self, *a, **k):
+        _init(self, *a, **k)
+        if sys.platform.startswith("win") and "backend" not in seen:
+            seen.add("backend")
+            if self.backend is None:
+                say("libusb: not loaded")
+            else:
+                try:
+                    code = self.backend.lib.libusb_set_option(self.backend.ctx, 1)
+                except Exception as e:
+                    code = repr(e)
+                say("libusb UsbDk backend: %s (libusb_set_option returned %s)" % ("on" if code == 0 else "OFF", code))
+    usblib.UsbClass.__init__ = init
+    _handshake = port.Port.handshake
+    def handshake(self, *a, **k):
+        ok = _handshake(self, *a, **k)
+        if ok:
+            say("connected to the clock in BROM mode")
+        return ok
+    port.Port.handshake = handshake
+runpy.run_path(script, run_name="__main__")
+"""
+NO_CONNECT_AFTER = 10      # seconds after BROM showed with no handshake: something stops mtkclient
+NOT_SUPPORTED = ("NotImplementedError", "Operation not supported", "LIBUSB_ERROR_NOT_SUPPORTED")
+
+
+def connected(text: str) -> bool:
+    """mtkclient's handshake with BROM worked (the shim's line, or mtkclient's own next lines)."""
+    return CONNECTED in text or "Detected regular mode" in text or "Detected iot mode" in text
+
+
+def open_failures(text: str) -> list[str]:
+    return [l[len(OPEN_FAILED):].strip() for l in text.splitlines() if l.startswith(OPEN_FAILED)]
+
+
+def no_driver(text: str) -> bool:
+    """libusb can list the device but not open it: on Windows, no UsbDk (or WinUSB) for it."""
+    return any(s in f for f in open_failures(text) for s in NOT_SUPPORTED)
 
 
 class MtkFailed(Exception):
@@ -125,9 +198,10 @@ def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str 
     fresh power-cycle; nothing is written in a failed attempt before the DA takes over."""
     for c in commands:
         assert_safe(c)
+    windrivers.check_brom_driver(ctx, ctx.state.get("platform"))   # Windows: UsbDk, before the clock is asked for
     cwd = Path(cwd)
     cwd.mkdir(parents=True, exist_ok=True)
-    args = [*_python(ctx), script(ctx)]
+    args = [*_python(ctx), "-c", MTK_SHIM, script(ctx)]
     args += ["multi", ";".join(commands)] if len(commands) > 1 else commands[0].split()
     logger = ctx.state.get("log")
     for attempt in range(1, TRIES + 1):
@@ -189,9 +263,25 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
     last = None
     hinted = nothing_hinted = False
     brom_at = None        # when BROM was last seen
+    brom_first = None     # when BROM was first seen
+    took_over = False     # mtkclient has the clock: its download agent on USB, or its handshake in its output
+    windows = windrivers.is_windows(ctx.state.get("platform"))
     reprompts = 1
     guard: dict = {}
     while proc.poll() is None:
+        text = _read(log)
+        if windows and no_driver(text):
+            # libusb lists the clock but can't open it: retrying can't help (issue 1).
+            windrivers.log_usb_devices(ctx, ctx.state.get("platform"))
+            raise windrivers.UsbDkMissing(windrivers.USBDK_NOT_WORKING)
+        if connected(text):
+            # On Windows the USB watcher may not see the download agent while UsbDk holds the clock, so
+            # mtkclient's own word counts too: never the unplug hint once it's connected.
+            took_over = True
+            if last != Mode.DA.value:
+                ctx.ui.status(Mode.DA.value)
+                last = Mode.DA.value
+            break
         try:
             mode = current(ctx)
         except UsbNoPermission:
@@ -212,10 +302,18 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
             proc.kill()   # mtkclient's preloader path fails on this clock: start again
             break
         if mode == Mode.DA:
+            took_over = True
             break
         waited = time.monotonic() - start
         if mode == Mode.BROM:
             brom_at = time.monotonic()
+            brom_first = brom_first or brom_at
+        if (windows and brom_first is not None and not nothing_hinted
+                and time.monotonic() - brom_first >= NO_CONNECT_AFTER):
+            # BROM showed, but no handshake: on Windows that's the driver, not the buttons (issue 1).
+            ctx.ui.say(windrivers.NO_CONNECT)
+            windrivers.log_usb_devices(ctx, ctx.state.get("platform"))
+            nothing_hinted = True
         # A short gap after BROM is the handover to the download agent, not a miss (e2e run 7); a long one
         # means the buttons were let go and the clock started normally, which is what the hint is for.
         if brom_at is None:
@@ -234,7 +332,7 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
             proc.kill()
             break
         _guarded(ctx, sleep, 0.25, guard)
-    if proc.poll() is None and last == Mode.DA.value:
+    if proc.poll() is None and took_over:
         ctx.ui.say("Connected. Leave the clock plugged in until this finishes.")
         with ctx.ui.busy(title) as job:
             while proc.poll() is None:
@@ -250,6 +348,13 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
             return text
     proc.wait()
     return ctx.runner.finished(proc)
+
+
+def _read(log: Path) -> str:
+    try:
+        return log.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
 
 
 def overall(log: Path, weights: list[int]):

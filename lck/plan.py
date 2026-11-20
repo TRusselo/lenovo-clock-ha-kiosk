@@ -48,6 +48,10 @@ class PrerequisitesStep(Step):
     def run(self, ctx) -> None:
         require_free_space(ctx.paths.root, NEEDED_FREE)
         detect()                       # libusb present, before the clock is touched
+        if backup.verify_backup(backup_dir(ctx)):
+            # Windows: the backup needs UsbDk for BROM mode. Before 200 MB of downloads, not after (issue 1).
+            from lck.windrivers import check_brom_driver
+            check_brom_driver(ctx, ctx.state.get("platform"))
         manifest = ctx.state.get("manifest") or load_manifest()
         for id_ in (f"platform-tools-{platform_id()}", platform_entry("uv", manifest, platform_arch()),
                     "mtkclient", "cube-avb-unlock", "at_auth_unlock.py", "fbmulti.py",

@@ -65,10 +65,26 @@ class RealRunner:
         proc.out_file.close()
         text = open(proc.out_file.name, "rb").read().decode("utf-8", "replace")
         if self.logger:
-            # mtkclient redraws its progress bar with \r: keep the last state of each line.
-            lines = [l.rsplit("\r", 1)[-1] for l in text.splitlines()]
-            self.logger.info("exit %s\n%s", proc.returncode, "\n".join(lines)[-4000:])
+            self.logger.info("exit %s\n%s", proc.returncode, condensed(text))
         return text
+
+
+def condensed(text: str, limit: int = 40000) -> str:
+    """A background command's whole output for the log, minus its progress bar: mtkclient redraws
+    that with \\r, so only the last state of each line is kept, and of a run of progress lines only the
+    last. Every other line stays (issue 1: the reason mtkclient waited was cut off). A very long
+    output keeps its start and its end."""
+    lines = [l.rsplit("\r", 1)[-1] for l in text.splitlines()]
+    kept: list[str] = []
+    for line in lines:
+        if kept and line.startswith("Progress:") and kept[-1].startswith("Progress:"):
+            kept[-1] = line
+        else:
+            kept.append(line)
+    out = "\n".join(kept)
+    if len(out) > limit:
+        out = out[:limit // 4] + "\n[... cut ...]\n" + out[-(limit * 3 // 4):]
+    return out
 
 
 def platform_id() -> str:
