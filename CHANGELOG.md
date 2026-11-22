@@ -2,6 +2,16 @@
 
 What changed for people converting a clock. Newest first.
 
+## 0.1.3 (2026-11-22)
+
+### Fixes for testers on Windows (issue 1)
+- **Cast stays hidden.** Setup stopped at step 13 with "Cast came back after the restart": the Windows program
+  saved the boot script that hides Cast with Windows line endings, and the clock couldn't follow it. The Mac and
+  Linux programs weren't affected. Rerun setup with this version: it carries on at step 13.
+- **Stopping the tool stops mtkclient too.** mtkclient kept running after a stopped run, holding the backup file
+  ("The process cannot access the file because it is being used by another process") and the clock, so the next
+  runs failed. If something still holds the file (say, after the window was closed mid-run), the tool says so.
+
 ## 0.1.2 (2026-11-21)
 
 ### Fixes for testers (issue 1)
