@@ -2,7 +2,20 @@
 
 What changed for people converting a clock. Newest first.
 
-## Unreleased
+## 0.1.2 (2026-11-21)
+
+### Fixes for testers (issue 1)
+- **Linux: runs on older PCs and older Linux.** v0.1.1's Linux program needed a CPU with AVX2 (about 2013 or
+  newer: older ones stopped with "Illegal instruction") and glibc 2.38 (Debian 12 and q4os have 2.36). It's now
+  built on Debian 11 for any 64-bit PC CPU, needs glibc 2.30 or newer, and every build checks it runs on a 2008 CPU.
+- **Mac: run it with sudo.** macOS's own driver takes the clock in BROM mode, and only an administrator can take it
+  over. The Mac guide says so now, and the tool stops at once with the exact `sudo` command if it's missing.
+
+### Volume buttons
+- **The clock's volume buttons work** after the conversion: before, they did nothing (Google's handler for them
+  doesn't run). A small helper from the Smart Display tool turns them into volume presses, 5% a press, repeating
+  while held. It's a Magisk module (the system image isn't changed); setup asks you to press each button once.
+  Tested on a clock.
 
 ### Time zones (from the Smart Display tool)
 - **Current time zone data:** setup installs the 2026f IANA database over the clock's 2021 copy, as a Magisk
@@ -23,6 +36,8 @@ What changed for people converting a clock. Newest first.
 - **The log says more:** lck's version and the OS on every run, whether UsbDk was found, why mtkclient couldn't
   open USB (it hid that), all of mtkclient's output (one line per progress bar), and on Windows the MediaTek USB
   devices with their drivers.
+
+## 0.1.1 and earlier
 
 ### Windows and macOS
 - **Ready-made programs for Windows, macOS (Apple silicon) and Linux**, built by GitHub Actions on a version tag,
