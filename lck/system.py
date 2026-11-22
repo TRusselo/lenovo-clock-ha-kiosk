@@ -328,7 +328,9 @@ class DegoogleStep(Step):
         looks there (e2e runs 2 and 3: Cast neither listed nor running after a restart)."""
         local = ctx.paths.root / "work" / "hide-cast.sh"
         local.parent.mkdir(parents=True, exist_ok=True)
-        local.write_text(HIDE_CAST, encoding="utf-8")
+        # As bytes: write_text gives CRLF on Windows, and the clock's sh then mounts over "…mediashell\r",
+        # which isn't Cast's folder (issue 1: Cast came back after the restart).
+        local.write_bytes(HIDE_CAST.encode())
         clock.adb(ctx, "push", local, "/data/local/tmp/hide-cast.sh", timeout=60)
         clock.su(ctx, f"mkdir -p {HIDE_SCRIPT.rsplit('/', 1)[0]} {EMPTY_DIR} && "
                       f"cp /data/local/tmp/hide-cast.sh {HIDE_SCRIPT} && chmod 755 {HIDE_SCRIPT} && "

@@ -121,3 +121,22 @@ class Tools:
         d = Path(cache) / f"platform-tools-{platform_id()}" / "platform-tools"
         exe = ".exe" if platform_id() == "windows" else ""
         return cls(adb=d / f"adb{exe}", fastboot=d / f"fastboot{exe}")
+
+
+def stop(proc) -> None:
+    """Stop a helper from spawn() and everything it started. mtkclient runs as uv's child, and killing uv
+    alone left it running (issue 1: on Windows it kept the backup file open; checked on Linux with uv 0.11.7).
+    spawn() starts each helper in its own session (process group on Windows), so the whole group goes.
+    Anything else, such as a test's stand-in, is only asked to stop: its pid may be another process's."""
+    if isinstance(proc, subprocess.Popen) and proc.poll() is None:
+        try:
+            if sys.platform.startswith("win"):
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, timeout=30)
+            else:
+                import os
+                import signal
+                os.killpg(proc.pid, signal.SIGKILL)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    proc.kill()

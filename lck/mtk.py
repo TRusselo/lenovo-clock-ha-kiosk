@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 from lck import windrivers
+from lck.runner import stop
 from lck.downloads import fetch
 from lck.modes import (helper_env, BROM_PROMPT, HINT_AFTER, NOTHING_HINT, PRELOADER_HINT, STARTED_AFTER, Mode,
                        UsbNoPermission, current)
@@ -225,7 +226,7 @@ def run_in_brom(ctx, commands: list[str], *, cwd: Path, title: str, prompt: str 
             except OSError:
                 text = ""
         except BaseException:
-            proc.kill()
+            stop(proc)
             ctx.runner.finished(proc)
             raise
         if proc.returncode == 0 and _ok(text, commands):
@@ -285,7 +286,7 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
         try:
             mode = current(ctx)
         except UsbNoPermission:
-            proc.kill()
+            stop(proc)
             ctx.runner.finished(proc)
             raise
         except Exception:
@@ -299,7 +300,7 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
         if mode == Mode.PRELOADER and not hinted:
             ctx.ui.say(PRELOADER_HINT)
             hinted = True
-            proc.kill()   # mtkclient's preloader path fails on this clock: start again
+            stop(proc)   # mtkclient's preloader path fails on this clock: start again
             break
         if mode == Mode.DA:
             took_over = True
@@ -329,7 +330,7 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
             ctx.ui.say("Still waiting. Do the steps above whenever you're ready, or press Ctrl-C to stop.")
             reprompts += 1
         if waited > timeout:
-            proc.kill()
+            stop(proc)
             break
         _guarded(ctx, sleep, 0.25, guard)
     if proc.poll() is None and took_over:
@@ -340,7 +341,7 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
                 if pct is not None:
                     job.note(f"{pct:.0f}%", pct, 100)
                 if time.monotonic() - start > timeout:
-                    proc.kill()
+                    stop(proc)
                 _guarded(ctx, sleep, 1, guard)
             text = ctx.runner.finished(proc)
             if proc.returncode != 0 or not _ok(text, commands):

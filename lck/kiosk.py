@@ -17,6 +17,7 @@ from pathlib import Path
 import requests
 
 from lck import clock, doc
+from lck.runner import stop
 from lck.apkcert import check as check_cert
 from lck.clock import adb, shell
 from lck.steps import Step
@@ -104,7 +105,7 @@ def fetch_apk(ctx) -> Path:
                 dest.unlink(missing_ok=True)
     http = _http(ctx)
     url, sha, name = latest_release(http)
-    saved.write_text(json.dumps({"url": url, "sha256": sha, "name": name}), encoding="utf-8")
+    saved.write_text(json.dumps({"url": url, "sha256": sha, "name": name}), encoding="utf-8", newline="\n")
     dest = folder / name
     with http.get(url, stream=True, timeout=120) as r:
         r.raise_for_status()
@@ -139,7 +140,7 @@ def push_with_progress(ctx, local: Path, remote: str, text: str, sleep=time.slee
                     job.note(f"{done >> 20} of {total >> 20} MB", done, total)
                 sleep(2)
     except BaseException:
-        proc.kill()
+        stop(proc)
         ctx.runner.finished(proc)
         raise
     out = ctx.runner.finished(proc)

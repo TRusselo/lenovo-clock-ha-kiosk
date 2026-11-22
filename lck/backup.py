@@ -144,7 +144,15 @@ def backup(ctx, out: Path) -> None:
     if not _complete_dump(out):
         # A dump that came out whole is kept if a later step fails: redoing it costs 40
         # minutes at the clock.
-        raw.unlink(missing_ok=True)
+        try:
+            raw.unlink(missing_ok=True)
+        except PermissionError as e:
+            # Windows (issue 1): a file still open can't be deleted. Stopping now stops mtkclient too
+            # (runner.stop), but one left by a closed window or a crash still holds it.
+            raise BackupMismatch(f"The last try's backup file is still in use: {raw}. Most likely mtkclient from "
+                                 "an earlier run is still running and holds it. Restart the computer (on Windows, "
+                                 "ending python.exe in Task Manager's Details tab also works), then run the same "
+                                 "command again.") from e
         mtk.run_in_brom(ctx, [f"rf {RAW}", "r preloader boot1.bin --parttype boot1",
                               "r preloader boot2.bin --parttype boot2"],
                         cwd=out, title="Backing up the clock: the whole disk, about 35 minutes",

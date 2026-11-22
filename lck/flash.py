@@ -21,7 +21,7 @@ from lck import clock
 from lck.downloads import fetch
 from lck.images import work
 from lck.modes import helper_env, FASTBOOT_PROMPT, POWER_CYCLE, Mode, current, stuck_hint, wait_for_mode, wait_to_leave
-from lck.runner import Result
+from lck.runner import Result, stop
 from lck.steps import Step
 from lck.ui import choose
 from lck.uvrun import uv_path, uv_python
@@ -104,7 +104,7 @@ def fbmulti(ctx, pairs: list[tuple[Path, str]], *, title: str, sleep=time.sleep)
                     # fixes). A few looks, so a USB blip isn't taken for it.
                     gone = gone + 1 if _mode(ctx) not in (Mode.FASTBOOT, None) else 0
                     if gone >= LEFT_AFTER:
-                        proc.kill()
+                        stop(proc)
                         break
                     sleep(1)
                 text = ctx.runner.finished(proc)
@@ -123,7 +123,7 @@ def fbmulti(ctx, pairs: list[tuple[Path, str]], *, title: str, sleep=time.sleep)
                                   "Unplug its power and run the same command again.")
         except BaseException:
             if proc.poll() is None:
-                proc.kill()
+                stop(proc)
                 ctx.runner.finished(proc)
             raise
     raise FlashFailed("The clock kept leaving fastboot mode, so the flash couldn't finish"

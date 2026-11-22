@@ -408,6 +408,31 @@ def test_degoogle_hides_cast_with_the_boot_script_in_one_restart(tmp_path, monke
     assert "mount -o bind /data/adb/empty-cast /oem/app/com.google.android.apps.mediashell" in system.HIDE_CAST
 
 
+def test_the_cast_script_reaches_the_clock_byte_for_byte(tmp_path, monkeypatch):
+    # Issue 1 (Windows): write_text turned the script's line ends into CRLF, the clock's sh read the folder names
+    # with a \r on the end, the mount missed Cast's real folder, and Cast came back after the restart.
+    from lck import system
+    cast = f"package:{system.CAST}\n"
+    runner = _degoogle_runner([Result(0, cast), Result(0, "")])
+    monkeypatch.setattr(clock, "reboot", lambda ctx, why="": None)
+    system.DegoogleStep().run(ctx_for(tmp_path, runner=runner, ip="10.0.0.7"))
+    assert (tmp_path / "work" / "hide-cast.sh").read_bytes() == system.HIDE_CAST.encode()
+
+
+def test_files_for_the_clock_are_never_written_with_this_computer_s_line_ends():
+    # The test above only fails on Windows. This one fails anywhere: every module that pushes files to the
+    # clock writes them as bytes, or as text with newline="\n".
+    import re
+    root = Path(__file__).resolve().parent.parent / "lck"
+    for f in root.glob("*.py"):
+        text = f.read_text(encoding="utf-8")
+        if '"push"' not in text:
+            continue
+        for m in re.finditer(r"\.write_text\((.*)$", text, re.M):
+            line = text[:m.start()].count("\n") + 1
+            assert 'newline="\\n"' in m.group(1), f"{f.name}:{line} writes text with this computer's line ends"
+
+
 def test_degoogle_without_root_stops_before_changing_anything(tmp_path, monkeypatch):
     from lck import system
     monkeypatch.setattr(clock, "reboot", lambda ctx, why="": None)

@@ -102,7 +102,7 @@ def patch(ctx, boot: Path) -> Path:
     shell(ctx, "rm", "-rf", DEVICE_DIR, check=False)
     if out.stat().st_size == 0 or out.read_bytes()[:8] != b"ANDROID!":
         raise RootFailed("The patched boot image came back damaged. Nothing was flashed.")
-    stamp.write_text(source)
+    stamp.write_text(source, encoding="utf-8", newline="\n")
     return out
 
 
