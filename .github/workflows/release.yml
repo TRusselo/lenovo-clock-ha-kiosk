@@ -35,15 +35,15 @@ jobs:
     steps:
       - name: Build tools (Linux container)
         if: matrix.container
-        # Debian 11's security updates were retired in 2026 (404s); the build needs only the release itself. If
-        # deb.debian.org drops Debian 11 too, the same release is on archive.debian.org.
+        # Debian 11 has moved to archive.debian.org: deb.debian.org now 404s on its security updates, which the
+        # image's own packages already are, so the build tools must come from the archive too.
         run: |
-          sed -i '/security/d' /etc/apt/sources.list
-          pkgs="build-essential binutils curl xz-utils zip qemu-user ca-certificates"
-          if ! (apt-get update && apt-get install -y --no-install-recommends $pkgs); then
-            sed -i 's|deb.debian.org|archive.debian.org|' /etc/apt/sources.list
-            apt-get update && apt-get install -y --no-install-recommends $pkgs
-          fi
+          printf '%s\n' 'deb http://archive.debian.org/debian bullseye main' \
+            'deb http://archive.debian.org/debian bullseye-updates main' \
+            'deb http://archive.debian.org/debian-security bullseye-security main' > /etc/apt/sources.list
+          rm -f /etc/apt/sources.list.d/*
+          apt-get -o Acquire::Check-Valid-Until=false update   # archived suites stop being "valid"
+          apt-get install -y --no-install-recommends build-essential binutils curl xz-utils zip qemu-user ca-certificates
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         if: ${{ !matrix.container }}
