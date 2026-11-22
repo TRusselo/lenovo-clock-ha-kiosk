@@ -109,3 +109,16 @@ def test_with_the_data_already_there_the_zone_step_restarts_the_clock(tmp_path, 
                          ["America/Edmonton"])
     tzdata.TimezoneStep().run(c)
     assert rebooted
+
+
+def test_the_nul_after_the_version_isnt_part_of_it(tmp_path, monkeypatch):
+    # head -c 12 of the real file is "tzdata2026f\0": the 12th byte is a NUL, and adb passes it through.
+    monkeypatch.setattr(tzdata.clock, "require_clock", lambda ctx: None)
+    monkeypatch.setattr(tzdata.clock, "reboot", lambda ctx, why="": None)
+    head = ASSET.read_bytes()[:12].decode("ascii")
+    assert head.endswith("\0")
+    c, _, ui = _ctx(tmp_path, {su(f"head -c 12 {tzdata.MODULE_FILE}"): [Result(1, ""), Result(0, head)],
+                               su(f"head -c 12 {tzdata.DEVICE_PATH}"): Result(0, head)})
+    tzdata.TzdataStep().run(c)
+    assert any(f"updated to {V}" in s for s in ui.lines)
+    assert tzdata.TzdataStep().done(c)

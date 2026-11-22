@@ -50,8 +50,10 @@ def _head(ctx, path: str) -> str:
 
 
 def _version_of(ctx, path: str) -> str:
+    """The version in the file's 12-byte header. Its last byte is a NUL ("tzdata2026f\\0"), which adb
+    passes through and strip() leaves: cut there, as version() does."""
     head = _head(ctx, path).strip()
-    return head[6:] if head.startswith("tzdata") else ""
+    return head.split("\0", 1)[0][6:].strip() if head.startswith("tzdata") else ""
 
 
 def in_use(ctx) -> str:
