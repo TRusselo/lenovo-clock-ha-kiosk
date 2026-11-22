@@ -86,6 +86,7 @@ start it.
   for the clock's small screen. Install it with HACS, then pick it in Kiosk Satellite. Its own page has the steps,
   and is where to ask about it.
 - [Time zones](TIMEZONES.md): the time zone data the tool installs, and dashboards that are an hour off.
+- [Changing the Wi-Fi](#changing-the-clocks-wi-fi): a new network or password, without setting up again.
 - Another backup, at any time: `lck backup --name <a new name>`.
 - To go back to a backup: `lck restore`, explained under "How it works" in the [README](../README.md#how-it-works).
 
@@ -106,6 +107,43 @@ volume presses again: 5% a press, repeating while held. It asks you to press eac
 
 If a button doesn't change the volume: run `lck setup --from volume-keys`. Still nothing? [Open an
 issue](../../../issues) with the log. Step 10 of the [manual](../devices/cube/README.md) has the details.
+
+## Changing the clock's Wi-Fi
+
+To move the clock to a new network, or give it a new password, tell it over adb while it's still on the old
+network. No reinstall, and no root needed.
+
+1. On a computer on the clock's current network, open a terminal in the folder you ran the tool from. The tool
+   downloaded adb there:
+   - Windows: `.\cache\platform-tools-windows\platform-tools\adb.exe` (in PowerShell, keep the `.\` in front)
+   - Mac: `cache/platform-tools-darwin/platform-tools/adb`, with `sudo` in front, as for the tool
+   - Linux: `cache/platform-tools-linux/platform-tools/adb`
+
+   Or use your own adb. Below, `adb` means whichever one you use.
+2. Connect, and open a shell on the clock, with the clock's current address:
+
+   ```
+   adb connect <the clock's address>:5555
+   adb -s <the clock's address>:5555 shell
+   ```
+
+3. In that shell, type this with your network's name and password. Keep the single quotes: they keep spaces and
+   symbols as they are. (A password with a `'` in it needs `'\''` in place of each `'`.)
+
+   ```
+   am startservice -n com.google.wifisetup/.WifiSetupService -a WifiSetupService.Connect -e ssid 'NAME' -e passphrase 'PASSWORD'
+   exit
+   ```
+
+   For a network with no password, leave out `-e passphrase 'PASSWORD'`.
+
+The clock joins the new network within a few seconds, and gets a new address there. Find it in your router's list
+of devices. If Home Assistant loses the clock, update the address under Settings, Devices & services, Kiosk
+Satellite.
+
+If the clock doesn't turn up on the new network, the name or password was probably mistyped. Unplug it and plug it
+back in: it should go back to the old network, which stays saved, so you can try again. (This last part is
+untested. If it stays off both networks, [open an issue](../../../issues).)
 
 ## Copying text from the terminal
 
