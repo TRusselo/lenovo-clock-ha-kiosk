@@ -35,7 +35,15 @@ jobs:
     steps:
       - name: Build tools (Linux container)
         if: matrix.container
-        run: apt-get update && apt-get install -y --no-install-recommends build-essential binutils curl xz-utils zip qemu-user ca-certificates
+        # Debian 11's security updates were retired in 2026 (404s); the build needs only the release itself. If
+        # deb.debian.org drops Debian 11 too, the same release is on archive.debian.org.
+        run: |
+          sed -i '/security/d' /etc/apt/sources.list
+          pkgs="build-essential binutils curl xz-utils zip qemu-user ca-certificates"
+          if ! (apt-get update && apt-get install -y --no-install-recommends $pkgs); then
+            sed -i 's|deb.debian.org|archive.debian.org|' /etc/apt/sources.list
+            apt-get update && apt-get install -y --no-install-recommends $pkgs
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         if: ${{ !matrix.container }}

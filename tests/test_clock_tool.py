@@ -40,8 +40,10 @@ def make_gpt(parts, guid=GUID, total=200) -> bytes:
 
 def ctx_for(tmp_path, runner=None, ui=None, **state):
     c = Context(runner=runner or FakeRunner(), ui=ui or FakeUI(), paths=Paths(tmp_path),
+                # Linux unless a test says otherwise: on a Windows CI runner the real UsbDk check and the Windows
+                # hints would otherwise run inside tests written for neither (the Windows ones pass platform="win32").
                 state={"progress_id": "clock", "tools": Tools(adb=Path("adb"), fastboot=Path("fastboot")),
-                       **state})
+                       "platform": "linux", **state})
     return c
 
 
