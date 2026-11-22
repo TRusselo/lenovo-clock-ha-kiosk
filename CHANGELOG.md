@@ -2,7 +2,7 @@
 
 What changed for people converting a clock. Newest first.
 
-## Unreleased
+## 0.1.4 (2026-11-22)
 
 - **`lck wifi`: change the clock's Wi-Fi** (a new network or password) without setting up again. With the clock
   on Wi-Fi it takes seconds, and a clock that can't join the new network goes back to its old one by itself.

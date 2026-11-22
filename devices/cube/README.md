@@ -340,6 +340,22 @@ volume keys change the volume (Lenovo's Things app handles both).
 **Check:** slot `_a`, channel `none-channel`, Kiosk Satellite is device owner, Cast isn't running and Lenovo's
 Things app is.
 
+## Change the Wi-Fi
+
+`lck wifi` puts a converted clock on another network, or gives it a new password, without setting up again
+([guide](../../docs/GUIDE.md#changing-the-clocks-wi-fi)).
+
+- **Clock on Wi-Fi:** by hand, in `adb shell` (no root): `am startservice -n
+  com.google.wifisetup/.WifiSetupService -a WifiSetupService.Connect -e ssid 'NAME' -e passphrase 'PASSWORD'`.
+  A wrong password fails after about 30 seconds and the clock goes back to its old network by itself.
+  **Check:** `logcat -d -s WifiSetupService:I` says `connecting to NAME succeeded`, and `dumpsys wifi` shows
+  `mWifiInfo SSID: NAME`.
+- **Clock off Wi-Fi:** in BROM, read `userdata` (about 20 minutes at 4 MB/s); `e2fsck -fy`; replace
+  `/misc/wifi/WifiConfigStore.xml` with only the new network (owner 1000:1000, mode 0600, label
+  `u:object_r:wifi_data_file:s0`); `e2fsck -fn`; flash it back as sparse pieces in fastboot (about 20 seconds).
+  Only the new network is kept: with two saved networks in range, the clock may join either.
+  **Check:** after a restart, `dumpsys wifi` shows `mWifiInfo SSID: NAME`.
+
 ## Restore
 
 **Never factory reset the clock to go back.** A reset while it's online unlinks it from your Google account on

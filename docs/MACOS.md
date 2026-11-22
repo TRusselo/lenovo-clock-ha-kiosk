@@ -60,7 +60,7 @@ only need it once. Run it from the folder you unzipped, the one that has the `lc
 The second runs the tool with **sudo** (as an administrator). It asks for this Mac's password: type it and press
 **Return**. Nothing shows while you type, that's normal. A Mac needs this because macOS's own driver takes the
 clock in BROM mode, and only an administrator can take it over. Without sudo the tool stops at once and says so.
-**Use sudo every time**, for every command of this tool (`sudo ./lck/lck backup`, `sudo ./lck/lck restore`, and
+**Use sudo every time**, for every command of this tool (`sudo ./lck/lck backup`, `sudo ./lck/lck restore`, `sudo ./lck/lck wifi`, and
 running setup again), so all its files belong to the same account.
 
 Don't double-click anything inside the `lck` folder in Finder. The program runs in Terminal.
