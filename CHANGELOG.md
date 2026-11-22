@@ -2,6 +2,12 @@
 
 What changed for people converting a clock. Newest first.
 
+## 0.1.5 (2026-11-22)
+
+- **The root step tries the boot image copy again.** Setup used to stop when copying Magisk's patched boot image
+  off the clock over Wi-Fi broke off (a tester's Mac: stuck at 92%). It now tries up to 3 times, checks each copy
+  is complete, and only stops, with plain words, if all 3 fail (issue 1).
+
 ## 0.1.4 (2026-11-22)
 
 - **`lck wifi`: change the clock's Wi-Fi** (a new network or password) without setting up again. With the clock
