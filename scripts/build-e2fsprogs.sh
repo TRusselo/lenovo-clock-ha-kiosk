@@ -18,7 +18,8 @@ cd "e2fsprogs-$VERSION"
 flags=(--disable-nls --disable-fuse2fs --disable-e2initrd-helper --disable-uuidd --without-libarchive
        --disable-defrag --disable-imager)
 if [ "$(uname)" = "Linux" ]; then
-  ./configure "${flags[@]}" LDFLAGS=-static >/dev/null
+  # Baseline x86-64 on purpose: a toolchain that defaults to newer (x86-64-v3) made a debugfs that needs AVX2.
+  ./configure "${flags[@]}" CFLAGS="${CFLAGS:--O2} -march=x86-64 -mtune=generic" LDFLAGS=-static >/dev/null
 else
   ./configure "${flags[@]}" >/dev/null
 fi

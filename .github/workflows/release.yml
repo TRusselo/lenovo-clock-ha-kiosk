@@ -24,12 +24,21 @@ jobs:
             name: windows-x86_64
           - os: macos-latest
             name: macos-arm64
+          # Linux: built on Debian 11 (glibc 2.31), for any CPU since 2003. PyInstaller bundles the build
+          # system's Python and libraries; on ubuntu-latest they needed glibc 2.38+ and the static debugfs
+          # needed AVX2 (issue 1: Debian 12 on an older PC couldn't run v0.1.1).
           - os: ubuntu-latest
             name: linux-x86_64
+            container: python:3.12-slim-bullseye
     runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
     steps:
+      - name: Build tools (Linux container)
+        if: matrix.container
+        run: apt-get update && apt-get install -y --no-install-recommends build-essential binutils curl xz-utils zip qemu-user ca-certificates
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        if: ${{ !matrix.container }}
         with:
           python-version: "3.12"
       - run: python -m pip install -r requirements.txt pytest pyinstaller
@@ -51,6 +60,20 @@ jobs:
           ./dist/lck/lck selfcheck
           ./dist/lck/lck setup --dry-run --workdir "$RUNNER_TEMP/lck-smoke"
           if find dist/lck -iname 'mtk.py' | grep -q .; then echo "mtkclient must not be bundled"; exit 1; fi
+      - name: Runs on an old PC (Linux)
+        if: matrix.container
+        shell: bash
+        run: |
+          # Nehalem (2008): no AVX. The program and the bundled e2fsprogs must run on it.
+          qemu-x86_64 -cpu Nehalem ./dist/lck/e2fsprogs/debugfs -V
+          qemu-x86_64 -cpu Nehalem ./dist/lck/e2fsprogs/e2fsck -V
+          qemu-x86_64 -cpu Nehalem ./dist/lck/lck --version
+          qemu-x86_64 -cpu Nehalem ./dist/lck/lck selfcheck
+          # And on glibc 2.31 (Debian 11, Ubuntu 20.04): nothing bundled may ask for newer.
+          newest=$(find dist/lck -type f \( -name 'lck' -o -name '*.so*' \) -exec objdump -T {} \; 2>/dev/null \
+                   | grep -o 'GLIBC_2\.[0-9]*' | sort -uV | tail -1)
+          echo "newest glibc needed: $newest"
+          [ "$(printf '%s\nGLIBC_2.31\n' "$newest" | sort -V | tail -1)" = "GLIBC_2.31" ]
       - name: Zip
         shell: bash
         run: |
