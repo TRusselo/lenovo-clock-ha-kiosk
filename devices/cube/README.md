@@ -169,7 +169,7 @@ IP address. Always pass `-s <clock-ip>:5555`, so nothing else connected is touch
 
 ## 9. `root`: Magisk
 
-Root comes before switching Google off: keeping Cast off needs it (step 12). Most people expect root anyway. The clock has no userdebug build, so the Smart Display's `adb root` route doesn't exist
+Root comes before switching Google off: keeping Cast off needs it (step 13). Most people expect root anyway. The clock has no userdebug build, so the Smart Display's `adb root` route doesn't exist
 here, and **`adb disable-verity` would likely stop it starting** (LK refuses a vbmeta with verity flags set).
 Magisk patches only `boot_a`; system and verity stay untouched.
 
@@ -189,7 +189,31 @@ Magisk patches only `boot_a`; system and verity stay untouched.
 **Check:** `adb shell magisk -v` prints `31.1:MAGISK:R`; `adb shell su -c id` prints `uid=0(root)`;
 `pidof com.google.android.things.sparrow.oem` prints a number.
 
-## 10. `timezone`: the clock's time zone
+## 10. `volume-keys`: the volume buttons
+
+The buttons are GPIOs, not key events: **VOLUME UP is GPIO 429** and **VOLUME DOWN is GPIO 576** (the PMIC's key
+pin), both `1` while pressed; the mic switch is GPIO 410. Android Things' `sparrow.oem` exports them and hands them
+to a Google listener that doesn't run on the converted clock, so the buttons did nothing (`getevent` shows no key
+for either). The Smart Display tool's helper, **VolKeys** (`assets/volkeys/VolKeys.java`, built into
+`assets/volkeys/ks-volkeys.jar` by `scripts/build-volkeys.sh`), watches the two pins and injects volume keys
+through InputManager: 5% a press, repeating while held. The display starts it from `/system`; here it's a
+**Magisk module** whose `service.sh` Magisk runs as root at every start, so the stock system image isn't touched.
+
+By hand, to try it once (Ctrl-C stops it):
+
+```bash
+adb push assets/volkeys/ks-volkeys.jar /data/local/tmp/ks-volkeys.jar
+adb shell "su -c 'CLASSPATH=/data/local/tmp/ks-volkeys.jar app_process /system/bin ks.VolKeys /sys/class/gpio/gpio429/value /sys/class/gpio/gpio576/value'"
+```
+
+The tool installs `/data/adb/modules/lck-volkeys` (`module.prop`, `service.sh`, `ks-volkeys.jar`; the script is in
+`lck/volkeys.py`), starts it, and asks you to press each button. Undo: remove **Volume buttons (lck)** in the
+Magisk app's Modules tab, then restart.
+
+**Check:** `adb shell ps -A -o ARGS | grep ks.VolKeys` lists it, and each press moves
+`adb shell settings get system volume_music_speaker` by 5. Tested on a clock: up, down, and held.
+
+## 11. `timezone`: the clock's time zone
 
 The clock keeps the zone it had under Google's setup (`persist.sys.timezone`). To change it, as root, then restart:
 
@@ -202,7 +226,7 @@ has its own older rules: see [TIMEZONES.md](../../docs/TIMEZONES.md).
 
 **Check, after a restart:** `adb shell getprop persist.sys.timezone` prints the zone.
 
-## 11. `tzdata`: current time zone data
+## 12. `tzdata`: current time zone data
 
 The clock's time zone data is a 2021 edition. The tool brings the current IANA data, built in Android 8's format
 (`assets/tzdata/tzdata`, made by `spikes/tzdata/build_tzdata.py`), and installs it as a **Magisk module**, so the
@@ -224,7 +248,7 @@ then restart.
 **Not yet tried on a clock:** the same file worked on the Smart Display (Android Things 8.1, like the clock),
 written straight over `/system` there.
 
-## 12. `degoogle`: Cast, Assistant, check-ins
+## 13. `degoogle`: Cast, Assistant, check-ins
 
 Cast (`mediashell`) and Assistant core are **persistent** apps: `disable-user` alone doesn't stop them, Android
 starts them again at boot, and Cast grew to about 594 MB of the clock's 1 GB, starving WebView until Kiosk
@@ -253,7 +277,7 @@ adb reboot
 Undo Cast: delete `/data/adb/post-fs-data.d/hide-cast.sh` and `/data/adb/empty-cast`, restart, then
 `adb shell pm enable com.google.android.apps.mediashell`.
 
-Until Kiosk Satellite is installed (step 14), the screen stays blank or shows four dots: Assistant's home screen
+Until Kiosk Satellite is installed (step 15), the screen stays blank or shows four dots: Assistant's home screen
 is off. Swiping up still opens the settings.
 
 **Never disable** `com.google.android.things.sparrow.oem`: on the clock it drives the light sensor and volume keys.
@@ -261,7 +285,7 @@ is off. Swiping up still opens the settings.
 **Check, after the restart:** `adb shell pm list packages com.google.android.apps.mediashell` prints nothing;
 `adb shell pidof com.google.android.things.sparrow.oem` prints a number.
 
-## 13. `keyboard`: an on-screen keyboard
+## 14. `keyboard`: an on-screen keyboard
 
 The clock's Android Things has **no input method at all**, so text fields on the screen can't be typed into.
 Install [Simple Keyboard](https://github.com/rkkr/simple-keyboard) (release 149, pinned in the manifest):
@@ -275,7 +299,7 @@ adb shell ime set rkr.simplekeyboard.inputmethod/.latin.LatinIME
 **Check:** `adb shell settings get secure default_input_method` prints
 `rkr.simplekeyboard.inputmethod/.latin.LatinIME`.
 
-## 14. `kiosk-install`: Kiosk Satellite
+## 15. `kiosk-install`: Kiosk Satellite
 
 Download the newest `*armeabi-v7a.apk` from Kiosk Satellite's releases. Check its digest (release API) and its
 signing certificate `2a77134ce11f65ba9d08bed669fdcb742a25633c5665a6135aeca30040b068fc`
@@ -283,7 +307,7 @@ signing certificate `2a77134ce11f65ba9d08bed669fdcb742a25633c5665a6135aeca30040b
 
 **Check:** `adb shell pm path me.jxl.kiosk_satellite` prints a `package:` line.
 
-## 15. `kiosk-grants`: permissions and device owner
+## 16. `kiosk-grants`: permissions and device owner
 
 ```bash
 adb shell appops set me.jxl.kiosk_satellite REQUEST_INSTALL_PACKAGES allow
@@ -298,7 +322,7 @@ adb shell dpm set-device-owner me.jxl.kiosk_satellite/.KioskAdminReceiver
 
 **Check:** `adb shell dumpsys device_policy` shows Kiosk Satellite under `Device Owner`.
 
-## 16. `kiosk-settings`: setup wizard and settings
+## 17. `kiosk-settings`: setup wizard and settings
 
 1. Go through Kiosk Satellite's setup wizard on the clock or at `http://<clock-ip>:2324`, and press **Finish**.
 2. Turn on "Act as the home screen" (`home.enabled`). Without it, Android falls back to the Things launcher.
@@ -311,7 +335,7 @@ adb shell dpm set-device-owner me.jxl.kiosk_satellite/.KioskAdminReceiver
 android.intent.category.HOME` ends with `me.jxl.kiosk_satellite/...`; the light sensor changes brightness and the
 volume keys change the volume (Lenovo's Things app handles both).
 
-## 17. `verify`: final check
+## 18. `verify`: final check
 
 **Check:** slot `_a`, channel `none-channel`, Kiosk Satellite is device owner, Cast isn't running and Lenovo's
 Things app is.

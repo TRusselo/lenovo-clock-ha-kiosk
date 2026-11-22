@@ -15,6 +15,8 @@ from lck.root import RootStep
 from lck.runner import Tools, platform_arch, platform_id
 from lck.steps import Step
 from lck.tzdata import TimezoneStep, TzdataStep
+from lck import volkeys
+from lck.volkeys import VolumeKeysStep
 from lck.system import CAST, THINGS_APP, ConnectStep, DegoogleStep, KeyboardStep, channel
 from lck.uvrun import uv_path
 
@@ -122,7 +124,9 @@ class VerifyStep(Step):
         if clock.shell(ctx, "pidof", CAST, check=False).strip():
             problems.append("Cast is running. Run: lck setup --from degoogle")
         if not clock.shell(ctx, "pidof", THINGS_APP, check=False).strip():
-            problems.append("Lenovo's Things app isn't running, so the volume keys and light sensor won't work")
+            problems.append("Lenovo's Things app isn't running, so the light sensor won't work")
+        if not volkeys.running(ctx):
+            problems.append("the volume button helper isn't running. Run: lck setup --from volume-keys")
         if problems:
             raise SetupFailed("Final check failed: " + "; ".join(problems) + ".")
         z = ctx.paths.backup / f"{ctx.state.get('progress_id', 'clock')}.zip"
@@ -150,6 +154,6 @@ class VerifyStep(Step):
 def setup_steps() -> list[Step]:
     return [
         PrerequisitesStep(), BackupStep(), UnlockStep(), ImagesStep(), UserdataStep(), MiscStep(),
-        FlashStep(), ConnectStep(), RootStep(), TimezoneStep(), TzdataStep(), DegoogleStep(), KeyboardStep(), InstallStep(), GrantsStep(),
+        FlashStep(), ConnectStep(), RootStep(), VolumeKeysStep(), TimezoneStep(), TzdataStep(), DegoogleStep(), KeyboardStep(), InstallStep(), GrantsStep(),
         SettingsStep(), VerifyStep(),
     ]

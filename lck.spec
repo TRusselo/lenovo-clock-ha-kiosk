@@ -8,6 +8,7 @@ datas = [
     ("manifest.json", "."),
     ("assets/linux", "assets/linux"),
     ("assets/tzdata", "assets/tzdata"),
+    ("assets/volkeys/ks-volkeys.jar", "assets/volkeys"),
     ("LICENSE", "."),
 ]
 

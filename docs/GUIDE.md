@@ -17,6 +17,7 @@ Every page in one place, in the order you'll need them.
        |                           starts stock Android Things, joins your Wi-Fi
        |-- you: the clock's address
        |-- root ---------------->  fastboot mode, then you: Magisk
+       |-- volume buttons ------>  you: press each one
        |-- Google off, keyboard, Kiosk Satellite (over Wi-Fi)
        |                           you: Kiosk Satellite setup
        |-- final check
@@ -96,6 +97,15 @@ start it.
 - If a try fails, the tool says why and starts the next one on a fresh screen. If the clock is still held by the
   last try, it asks you to unplug the power first.
 - Check the cable: straight-through A-to-A, into the clock's USB port.
+
+## Volume buttons
+
+On the stock clock, Google's software handles the volume buttons, and that software doesn't run once the clock is
+converted. Setup installs a small helper (a Magisk module, **Volume buttons (lck)**) that turns the buttons into
+volume presses again: 5% a press, repeating while held. It asks you to press each button once to check.
+
+If a button doesn't change the volume: run `lck setup --from volume-keys`. Still nothing? [Open an
+issue](../../../issues) with the log. Step 10 of the [manual](../devices/cube/README.md) has the details.
 
 ## Copying text from the terminal
 
