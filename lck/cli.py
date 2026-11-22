@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -235,8 +236,31 @@ def _log_error(args, text: str) -> None:
         pass
 
 
+def needs_sudo(args) -> bool:
+    """On a Mac, the commands that reach the clock over USB run as root (sudo): macOS's own serial driver
+    takes the clock in BROM mode, and only root can take it over (a tester's Mac, issue 1). Checked
+    before anything is made, so the work folder never mixes files of two accounts."""
+    if sys.platform != "darwin" or args.command not in ("setup", "backup", "restore"):
+        return False
+    if getattr(args, "dry_run", False):
+        return False
+    return os.geteuid() != 0
+
+
+SUDO_NEEDED = ("On a Mac, this needs administrator rights: macOS's own driver holds the clock in BROM mode, and "
+               "only an administrator can take it over. Run it with sudo, and type this Mac's password when it "
+               "asks (nothing shows while you type):\n\n  {command}\n\nUse sudo every time, for every command "
+               "of this tool.")
+
+
 def main(argv=None) -> int:
     args = _parser().parse_args(argv)
+    if needs_sudo(args):
+        # From source, argv[0] is lck/__main__.py: the command to repeat is python -m lck.
+        prog = (f"{sys.executable} -m lck" if sys.argv and sys.argv[0].endswith("__main__.py")
+                else (sys.argv[0] if sys.argv else "./lck/lck"))
+        print(SUDO_NEEDED.format(command=" ".join(["sudo", prog, *sys.argv[1:]])), file=sys.stderr)
+        return 2
     try:
         return {"setup": _setup, "backup": _backup, "restore": _restore, "status": _status,
                 "selfcheck": _selfcheck}[args.command](args)

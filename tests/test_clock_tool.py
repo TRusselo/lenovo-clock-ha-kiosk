@@ -1166,3 +1166,38 @@ def test_the_nothing_yet_hint_comes_once_per_wait(tmp_path):
     ui = _fastboot_wait(tmp_path, [(t, []) for t in range(0, 700, 10)] + [(700, [Mode.FASTBOOT])])
     assert sum("Nothing yet" in l for l in ui.lines) == 1
     assert sum("Still waiting" in l for l in ui.lines) >= 2
+
+
+# --- macOS: administrator rights -------------------------------------------
+
+def test_on_a_mac_without_sudo_it_says_to_use_sudo_before_anything(tmp_path, monkeypatch, capsys):
+    # A tester's Mac needed sudo: macOS's own driver holds the clock in BROM mode, and only root takes it over.
+    from lck import cli
+    monkeypatch.setattr(cli.sys, "platform", "darwin")
+    monkeypatch.setattr(cli.os, "geteuid", lambda: 501, raising=False)
+    monkeypatch.setattr(cli.sys, "argv", ["./lck/lck", "setup"])
+    assert cli.main(["setup", "--workdir", str(tmp_path)]) == 2
+    err = capsys.readouterr().err
+    assert "sudo ./lck/lck setup" in err
+    assert not (tmp_path / "logs").exists()          # nothing made, so nothing owned by the wrong account
+
+
+def test_on_a_mac_dry_run_and_status_need_no_sudo(tmp_path, monkeypatch):
+    from lck import cli
+    monkeypatch.setattr(cli.sys, "platform", "darwin")
+    monkeypatch.setattr(cli.os, "geteuid", lambda: 501, raising=False)
+    assert cli.needs_sudo(cli._parser().parse_args(["setup", "--dry-run"])) is False
+    assert cli.needs_sudo(cli._parser().parse_args(["status"])) is False
+    assert cli.needs_sudo(cli._parser().parse_args(["backup"])) is True
+    monkeypatch.setattr(cli.os, "geteuid", lambda: 0, raising=False)
+    assert cli.needs_sudo(cli._parser().parse_args(["backup"])) is False
+
+
+def test_from_source_on_a_mac_the_sudo_command_is_python_m_lck(tmp_path, monkeypatch, capsys):
+    from lck import cli
+    monkeypatch.setattr(cli.sys, "platform", "darwin")
+    monkeypatch.setattr(cli.os, "geteuid", lambda: 501, raising=False)
+    monkeypatch.setattr(cli.sys, "argv", ["/x/lck/__main__.py", "backup", "--name", "c1"])
+    monkeypatch.setattr(cli.sys, "executable", "/x/.venv/bin/python")
+    assert cli.main(["backup", "--name", "c1", "--workdir", str(tmp_path)]) == 2
+    assert "sudo /x/.venv/bin/python -m lck backup --name c1" in capsys.readouterr().err

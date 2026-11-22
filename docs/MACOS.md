@@ -51,11 +51,17 @@ Copy these two lines into Terminal and press **Return**:
 
 ```bash
 xattr -dr com.apple.quarantine lck
-./lck/lck setup
+sudo ./lck/lck setup
 ```
 
 The first line stops macOS from blocking the program because it was downloaded and isn't signed by Apple. You
 only need it once. Run it from the folder you unzipped, the one that has the `lck` folder in it.
+
+The second runs the tool with **sudo** (as an administrator). It asks for this Mac's password: type it and press
+**Return**. Nothing shows while you type, that's normal. A Mac needs this because macOS's own driver takes the
+clock in BROM mode, and only an administrator can take it over. Without sudo the tool stops at once and says so.
+**Use sudo every time**, for every command of this tool (`sudo ./lck/lck backup`, `sudo ./lck/lck restore`, and
+running setup again), so all its files belong to the same account.
 
 Don't double-click anything inside the `lck` folder in Finder. The program runs in Terminal.
 
@@ -79,7 +85,9 @@ At the end the tool names your backup file, in the `backup` folder. Copy it some
 you can, and keep it private: it holds the clock's own keys and its Wi-Fi details, and it's the only way back to
 the clock's original software.
 
-The `work` folder holds the images built from it, with your Wi-Fi password. Delete it once the clock works.
+The `work` folder holds the images built from it, with your Wi-Fi password. Delete it once the clock works. The
+tool ran with sudo, so its files belong to the administrator: copy the backup with `sudo cp`, and delete the work
+folder with `sudo rm -rf work` (in the folder you unzipped).
 
 ## If macOS blocks the program
 
@@ -87,7 +95,7 @@ macOS blocks programs from the internet that Apple hasn't checked. This one isn'
 developer account. The block is a message that macOS can't verify `lck`, or that it may be malware.
 
 1. Click anything except **Move to Trash** (or **Move to Bin**).
-2. In Terminal, in the folder you unzipped, run the `xattr` line from step 4 again, then `./lck/lck setup`.
+2. In Terminal, in the folder you unzipped, run the `xattr` line from step 4 again, then `sudo ./lck/lck setup`.
    Check you're in the right folder first: `ls` should list `lck`.
 3. If it's still blocked, open **System Settings > Privacy & Security**, scroll down to the message about `lck`,
    and click **Open Anyway**.

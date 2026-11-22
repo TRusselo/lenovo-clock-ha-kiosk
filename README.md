@@ -80,8 +80,9 @@ You don't need a GitHub account, and you don't need to know any code. You'll typ
 
 **4. Type the command** and press Enter:
 - Windows: `lck\lck setup`
-- Mac: `xattr -dr com.apple.quarantine lck` first, then `./lck/lck setup`. The first command stops macOS
-  blocking the program ([more](docs/MACOS.md#if-macos-blocks-the-program)).
+- Mac: `xattr -dr com.apple.quarantine lck` first, then `sudo ./lck/lck setup`. The first command stops macOS
+  blocking the program ([more](docs/MACOS.md#if-macos-blocks-the-program)). A Mac needs `sudo` for every `lck`
+  command: it asks for the Mac's password ([why](docs/MACOS.md#4-run-it)).
 - Linux: `./lck/lck setup`
 
 **5. Do what it says.** It tells you each time it needs you: which buttons to hold on the clock, what to set up on
@@ -176,9 +177,9 @@ Your Wi-Fi comes back from the backup (or the tool adds the one you type, which 
 Assistant sign-in is done **on the clock itself** or in a browser at an address the tool shows you.
 
 **To make another backup** at any time, in the same folder: `lck\lck backup --name clock-later` on Windows, or
-`./lck/lck backup --name clock-later` on Mac and Linux.
+`./lck/lck backup --name clock-later` on Linux (`sudo ./lck/lck …` on a Mac).
 **To go back** to a backup: `lck\lck restore backup\clock.zip` on Windows, or `./lck/lck restore backup/clock.zip`
-on Mac and Linux. It checks the
+on Linux (with `sudo` in front on a Mac). It checks the
 backup is from this clock, then writes it back in BROM mode. It takes about 20 minutes. A backup only restores to
 the clock it came from. The bootloader stays unlocked; stock starts fine that way. **Never use the clock's own
 factory reset to go back:** done while online, it unlinks the clock from your Google account, which no restore can

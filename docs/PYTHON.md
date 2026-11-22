@@ -33,6 +33,15 @@ pip install -r requirements.txt
 python -m lck setup
 ```
 
+**On a Mac, run it with sudo**, and the venv's Python by its path (sudo doesn't keep the activated venv):
+
+```bash
+sudo .venv/bin/python -m lck setup
+```
+
+macOS's own driver takes the clock in BROM mode, and only an administrator can take it over. Use sudo for every
+`lck` command on a Mac, so all the files belong to the same account.
+
 Options:
 - `--dry-run`: list the steps, change nothing
 - `--from STEP`: start at a step
