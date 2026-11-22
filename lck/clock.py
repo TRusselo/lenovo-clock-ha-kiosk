@@ -11,6 +11,7 @@ import ipaddress
 import shlex
 import re
 import time
+from pathlib import Path
 
 from lck import doc
 
@@ -241,6 +242,31 @@ def reboot(ctx, why="the clock to restart") -> None:
     adb(ctx, "reboot", check=False, timeout=30)
     _run(ctx, "disconnect", address(ctx), check=False, timeout=15)
     wait_restarted(ctx, old, why=why)
+
+
+PULL_TRIES = 3
+
+
+def pull(ctx, remote: str, local, tries: int = PULL_TRIES, sleep=time.sleep) -> None:
+    """Copy a file off the clock over Wi-Fi, checked against the clock's own md5sum of it, trying again when
+    the copy breaks off or comes out short (issue 1, Mac: the patched boot image stalled at 92% for 2.5
+    minutes, adb gave up, and setup stopped; the rerun copied it at once)."""
+    import hashlib
+    local = Path(local)
+    want = shell(ctx, "md5sum", remote, check=False, timeout=60).split()[:1]
+    for attempt in range(1, tries + 1):
+        local.unlink(missing_ok=True)
+        r = adb(ctx, "pull", remote, str(local), check=False, timeout=300)
+        if r.code == 0 and local.exists() and (not want or hashlib.md5(local.read_bytes()).hexdigest() == want[0]):
+            return
+        local.unlink(missing_ok=True)
+        if attempt < tries:
+            ctx.ui.say(f"The copy from the clock broke off (Wi-Fi). Trying again, {attempt + 1} of {tries}.")
+            sleep(5)
+            connect(ctx)
+    raise SetupFailed(f"Couldn't copy {Path(remote).name} off the clock over Wi-Fi, after {tries} tries. Check "
+                      "the clock's Wi-Fi signal (move it closer to the router, say), then run the same command "
+                      "again. Nothing was written to the clock.")
 
 
 def wifi_ip(ctx) -> str:

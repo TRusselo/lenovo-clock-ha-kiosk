@@ -98,7 +98,7 @@ def patch(ctx, boot: Path) -> Path:
                       check=False, timeout=600)
         if r.code != 0 or "new-boot.img" not in shell(ctx, "ls", DEVICE_DIR, check=False):
             raise RootFailed("Magisk couldn't patch the boot image. Nothing was flashed; the log has why.")
-        clock.adb(ctx, "pull", f"{DEVICE_DIR}/new-boot.img", out, timeout=300)
+        clock.pull(ctx, f"{DEVICE_DIR}/new-boot.img", out)
     shell(ctx, "rm", "-rf", DEVICE_DIR, check=False)
     if out.stat().st_size == 0 or out.read_bytes()[:8] != b"ANDROID!":
         raise RootFailed("The patched boot image came back damaged. Nothing was flashed.")
