@@ -84,7 +84,7 @@ start it.
 - [Lenovo Clock Dashboard](https://github.com/TRusselo/lenovo-clock-dashboard): a Home Assistant dashboard made
   for the clock's small screen. Install it with HACS, then pick it in Kiosk Satellite. Its own page has the steps,
   and is where to ask about it.
-- [Time zones](TIMEZONES.md): why the clock uses a fixed-offset zone.
+- [Time zones](TIMEZONES.md): the time zone data the tool installs, and dashboards that are an hour off.
 - Another backup, at any time: `lck backup --name <a new name>`.
 - To go back to a backup: `lck restore`, explained under "How it works" in the [README](../README.md#how-it-works).
 

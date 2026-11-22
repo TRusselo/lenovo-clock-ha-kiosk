@@ -4,6 +4,14 @@ What changed for people converting a clock. Newest first.
 
 ## Unreleased
 
+### Time zones (from the Smart Display tool)
+- **Current time zone data:** setup installs the 2026f IANA database over the clock's 2021 copy, as a Magisk
+  module (the system image isn't changed), so regions whose daylight saving rules changed since, such as
+  Alberta, get the right time. Untested on a clock so far; tested on the Smart Display.
+- **The time zone question:** setup shows the clock's zone and lets you type another, checked against that data.
+- **[TIMEZONES.md](docs/TIMEZONES.md):** dashboards keep the browser's own old rules; a fixed-offset zone or a
+  Home Assistant template fixes them. "Use server time zone" doesn't.
+
 ### Windows: BROM mode (issue 1)
 - **UsbDk is checked before BROM mode,** at the start of setup and before every backup or restore. Without it,
   Windows shows the clock in BROM mode but can't open it, and the clock started normally after a few seconds with

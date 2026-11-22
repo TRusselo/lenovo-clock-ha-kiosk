@@ -14,6 +14,7 @@ from lck.modes import detect
 from lck.root import RootStep
 from lck.runner import Tools, platform_arch, platform_id
 from lck.steps import Step
+from lck.tzdata import TimezoneStep, TzdataStep
 from lck.system import CAST, THINGS_APP, ConnectStep, DegoogleStep, KeyboardStep, channel
 from lck.uvrun import uv_path
 
@@ -149,6 +150,6 @@ class VerifyStep(Step):
 def setup_steps() -> list[Step]:
     return [
         PrerequisitesStep(), BackupStep(), UnlockStep(), ImagesStep(), UserdataStep(), MiscStep(),
-        FlashStep(), ConnectStep(), RootStep(), DegoogleStep(), KeyboardStep(), InstallStep(), GrantsStep(),
+        FlashStep(), ConnectStep(), RootStep(), TimezoneStep(), TzdataStep(), DegoogleStep(), KeyboardStep(), InstallStep(), GrantsStep(),
         SettingsStep(), VerifyStep(),
     ]

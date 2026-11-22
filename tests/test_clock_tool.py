@@ -311,7 +311,7 @@ def test_ip_is_checked():
 def test_steps_are_in_the_manuals_order():
     names = [s.name for s in plan.setup_steps()]
     assert names == ["prerequisites", "backup", "unlock", "images", "userdata", "misc", "flash", "connect",
-                     "root", "degoogle", "keyboard", "kiosk-install", "kiosk-grants", "kiosk-settings",
+                     "root", "timezone", "tzdata", "degoogle", "keyboard", "kiosk-install", "kiosk-grants", "kiosk-settings",
                      "verify"]
 
 

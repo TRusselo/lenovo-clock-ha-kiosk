@@ -89,7 +89,7 @@ and the fingerprint in userdata's `/system/packages.xml` (after `e2fsck -fy` on 
 was slot B, `OIMK.211005.001`.
 
 From that slot: `boot`, `vendor`, `vbmeta`, `system`, `oem`. Keep the stock `boot` as `boot-stock.img`: it's the
-undo for step 14. Make sparse pieces of the big ones:
+undo for step 9. Make sparse pieces of the big ones:
 
 ```bash
 python -c "from lck.sparse import write_pieces; write_pieces('system_b.bin', 'system_chunk', 94371840)"
@@ -169,7 +169,7 @@ IP address. Always pass `-s <clock-ip>:5555`, so nothing else connected is touch
 
 ## 9. `root`: Magisk
 
-Root comes before switching Google off: keeping Cast off needs it (step 10). Most people expect root anyway. The clock has no userdebug build, so the Smart Display's `adb root` route doesn't exist
+Root comes before switching Google off: keeping Cast off needs it (step 12). Most people expect root anyway. The clock has no userdebug build, so the Smart Display's `adb root` route doesn't exist
 here, and **`adb disable-verity` would likely stop it starting** (LK refuses a vbmeta with verity flags set).
 Magisk patches only `boot_a`; system and verity stay untouched.
 
@@ -189,7 +189,42 @@ Magisk patches only `boot_a`; system and verity stay untouched.
 **Check:** `adb shell magisk -v` prints `31.1:MAGISK:R`; `adb shell su -c id` prints `uid=0(root)`;
 `pidof com.google.android.things.sparrow.oem` prints a number.
 
-## 10. `degoogle`: Cast, Assistant, check-ins
+## 10. `timezone`: the clock's time zone
+
+The clock keeps the zone it had under Google's setup (`persist.sys.timezone`). To change it, as root, then restart:
+
+```bash
+adb shell "su -c 'setprop persist.sys.timezone America/Edmonton'"
+```
+
+Pick a name from the IANA database (the tool checks it against `assets/tzdata/tzdata`). The dashboards' browser
+has its own older rules: see [TIMEZONES.md](../../docs/TIMEZONES.md).
+
+**Check, after a restart:** `adb shell getprop persist.sys.timezone` prints the zone.
+
+## 11. `tzdata`: current time zone data
+
+The clock's time zone data is a 2021 edition. The tool brings the current IANA data, built in Android 8's format
+(`assets/tzdata/tzdata`, made by `spikes/tzdata/build_tzdata.py`), and installs it as a **Magisk module**, so the
+stock system image isn't touched: Magisk mounts the file over `/system/usr/share/zoneinfo/tzdata` at every start.
+The file must carry the `system_file` label, or apps can't read it.
+
+```bash
+adb push assets/tzdata/tzdata /data/local/tmp/lck-tzdata
+printf 'id=lck-tzdata\nname=Time zone data (lck)\nversion=2026f\nversionCode=1\nauthor=lck\ndescription=Current IANA time zone data\n' > module.prop
+adb push module.prop /data/local/tmp/lck-tzdata.prop
+adb shell "su -c 'mkdir -p /data/adb/modules/lck-tzdata/system/usr/share/zoneinfo && cp /data/local/tmp/lck-tzdata /data/adb/modules/lck-tzdata/system/usr/share/zoneinfo/tzdata && cp /data/local/tmp/lck-tzdata.prop /data/adb/modules/lck-tzdata/module.prop && chmod 644 /data/adb/modules/lck-tzdata/system/usr/share/zoneinfo/tzdata /data/adb/modules/lck-tzdata/module.prop && chcon -R u:object_r:system_file:s0 /data/adb/modules/lck-tzdata/system && rm /data/local/tmp/lck-tzdata /data/local/tmp/lck-tzdata.prop'"
+adb reboot
+```
+
+Undo: remove **Time zone data (lck)** in the Magisk app's Modules tab, or delete `/data/adb/modules/lck-tzdata`,
+then restart.
+
+**Check, after the restart:** `adb shell head -c 12 /system/usr/share/zoneinfo/tzdata` prints `tzdata2026f`.
+**Not yet tried on a clock:** the same file worked on the Smart Display (Android Things 8.1, like the clock),
+written straight over `/system` there.
+
+## 12. `degoogle`: Cast, Assistant, check-ins
 
 Cast (`mediashell`) and Assistant core are **persistent** apps: `disable-user` alone doesn't stop them, Android
 starts them again at boot, and Cast grew to about 594 MB of the clock's 1 GB, starving WebView until Kiosk
@@ -218,7 +253,7 @@ adb reboot
 Undo Cast: delete `/data/adb/post-fs-data.d/hide-cast.sh` and `/data/adb/empty-cast`, restart, then
 `adb shell pm enable com.google.android.apps.mediashell`.
 
-Until Kiosk Satellite is installed (step 12), the screen stays blank or shows four dots: Assistant's home screen
+Until Kiosk Satellite is installed (step 14), the screen stays blank or shows four dots: Assistant's home screen
 is off. Swiping up still opens the settings.
 
 **Never disable** `com.google.android.things.sparrow.oem`: on the clock it drives the light sensor and volume keys.
@@ -226,7 +261,7 @@ is off. Swiping up still opens the settings.
 **Check, after the restart:** `adb shell pm list packages com.google.android.apps.mediashell` prints nothing;
 `adb shell pidof com.google.android.things.sparrow.oem` prints a number.
 
-## 11. `keyboard`: an on-screen keyboard
+## 13. `keyboard`: an on-screen keyboard
 
 The clock's Android Things has **no input method at all**, so text fields on the screen can't be typed into.
 Install [Simple Keyboard](https://github.com/rkkr/simple-keyboard) (release 149, pinned in the manifest):
@@ -240,7 +275,7 @@ adb shell ime set rkr.simplekeyboard.inputmethod/.latin.LatinIME
 **Check:** `adb shell settings get secure default_input_method` prints
 `rkr.simplekeyboard.inputmethod/.latin.LatinIME`.
 
-## 12. `kiosk-install`: Kiosk Satellite
+## 14. `kiosk-install`: Kiosk Satellite
 
 Download the newest `*armeabi-v7a.apk` from Kiosk Satellite's releases. Check its digest (release API) and its
 signing certificate `2a77134ce11f65ba9d08bed669fdcb742a25633c5665a6135aeca30040b068fc`
@@ -248,7 +283,7 @@ signing certificate `2a77134ce11f65ba9d08bed669fdcb742a25633c5665a6135aeca30040b
 
 **Check:** `adb shell pm path me.jxl.kiosk_satellite` prints a `package:` line.
 
-## 13. `kiosk-grants`: permissions and device owner
+## 15. `kiosk-grants`: permissions and device owner
 
 ```bash
 adb shell appops set me.jxl.kiosk_satellite REQUEST_INSTALL_PACKAGES allow
@@ -263,7 +298,7 @@ adb shell dpm set-device-owner me.jxl.kiosk_satellite/.KioskAdminReceiver
 
 **Check:** `adb shell dumpsys device_policy` shows Kiosk Satellite under `Device Owner`.
 
-## 14. `kiosk-settings`: setup wizard and settings
+## 16. `kiosk-settings`: setup wizard and settings
 
 1. Go through Kiosk Satellite's setup wizard on the clock or at `http://<clock-ip>:2324`, and press **Finish**.
 2. Turn on "Act as the home screen" (`home.enabled`). Without it, Android falls back to the Things launcher.
@@ -276,7 +311,7 @@ adb shell dpm set-device-owner me.jxl.kiosk_satellite/.KioskAdminReceiver
 android.intent.category.HOME` ends with `me.jxl.kiosk_satellite/...`; the light sensor changes brightness and the
 volume keys change the volume (Lenovo's Things app handles both).
 
-## 15. `verify`: final check
+## 17. `verify`: final check
 
 **Check:** slot `_a`, channel `none-channel`, Kiosk Satellite is device owner, Cast isn't running and Lenovo's
 Things app is.

@@ -7,6 +7,7 @@ from PyInstaller.utils.hooks import collect_dynamic_libs
 datas = [
     ("manifest.json", "."),
     ("assets/linux", "assets/linux"),
+    ("assets/tzdata", "assets/tzdata"),
     ("LICENSE", "."),
 ]
 

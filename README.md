@@ -40,7 +40,7 @@ The tool checks the model over Wi-Fi before it changes anything there, and refus
 | Screen | Google's clock face | Your Home Assistant dashboard, with [one made for this screen](https://github.com/TRusselo/lenovo-clock-dashboard) (HACS) |
 | Assistant | Google, in the cloud | Off. Home Assistant voice is planned, not yet tested |
 | Music | Cast | Music Assistant (Sendspin), volume buttons work |
-| Clock | Wrong after DST rule changes | Right, with a fixed-offset zone ([how](docs/TIMEZONES.md)) |
+| Clock | Wrong after DST rule changes | Current time zone data installed; dashboards: a fixed-offset zone ([how](docs/TIMEZONES.md)) |
 | Brightness | Automatic | Automatic (light sensor) |
 | Keyboard | None | Simple Keyboard, for typing on the screen |
 | Root | No | Magisk |
