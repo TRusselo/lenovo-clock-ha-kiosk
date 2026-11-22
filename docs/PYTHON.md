@@ -52,7 +52,8 @@ Options:
 - `--workdir DIR`: where downloads, backups, logs and progress go
 
 `python -m lck status` shows which steps are done. `python -m lck backup` backs the clock up at any time.
-`python -m lck restore BACKUP` restores a backup: the folder or its zip.
+`python -m lck restore BACKUP` restores a backup: the folder or its zip. `python -m lck wifi` puts the clock on
+another Wi-Fi network, or gives it a new password ([guide](GUIDE.md#changing-the-clocks-wi-fi)).
 
 ## Tests
 

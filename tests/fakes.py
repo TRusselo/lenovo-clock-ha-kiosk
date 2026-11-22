@@ -48,9 +48,12 @@ class FakeUI:
         self.lines: list[str] = []
         self.statuses: list[str] = []
         self.answers = list(answers or [])
+        self.unlogged: list[str] = []
 
     def say(self, text, log=True):
         self.lines.append(text)
+        if not log:
+            self.unlogged.append(text)
 
     def physical(self, text):
         self.lines.append(f"[physical] {text}")

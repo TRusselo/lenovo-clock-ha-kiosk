@@ -2,6 +2,15 @@
 
 What changed for people converting a clock. Newest first.
 
+## Unreleased
+
+- **`lck wifi`: change the clock's Wi-Fi** (a new network or password) without setting up again. With the clock
+  on Wi-Fi it takes seconds, and a clock that can't join the new network goes back to its old one by itself.
+  With the clock off Wi-Fi, it reads and writes back only the user data over USB (BROM, then fastboot), keeping
+  everything else, with the new network in place of the old ones. Setup now replaces a saved network of the same
+  name when it adds the Wi-Fi you typed, instead of keeping both.
+  Tested on a clock both ways. [Guide](docs/GUIDE.md#changing-the-clocks-wi-fi).
+
 ## 0.1.3 (2026-11-22)
 
 ### Fixes for testers on Windows (issue 1)

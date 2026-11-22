@@ -178,6 +178,8 @@ Assistant sign-in is done **on the clock itself** or in a browser at an address 
 
 **To make another backup** at any time, in the same folder: `lck\lck backup --name clock-later` on Windows, or
 `./lck/lck backup --name clock-later` on Linux (`sudo ./lck/lck …` on a Mac).
+**To change the clock's Wi-Fi** (a new network or password): `lck wifi`, explained in the
+[guide](docs/GUIDE.md#changing-the-clocks-wi-fi).
 **To go back** to a backup: `lck\lck restore backup\clock.zip` on Windows, or `./lck/lck restore backup/clock.zip`
 on Linux (with `sudo` in front on a Mac). It checks the
 backup is from this clock, then writes it back in BROM mode. It takes about 20 minutes. A backup only restores to

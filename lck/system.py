@@ -104,11 +104,14 @@ def ask_wifi_ready(ctx) -> bool:
         ctx.ui.say(f'"{answer}" isn\'t an answer here. Type YES or NO.')
 
 
-def ask_wifi(ctx):
-    """The Wi-Fi name and password, for the clock's user data."""
+ASK_WIFI_WHY = ("The clock needs a Wi-Fi network to come back on after the flash. The tool adds yours to its user "
+                "data. The password is kept only in the work folder's images, like a backup's own, and never logged.")
+
+
+def ask_wifi(ctx, why: str = ASK_WIFI_WHY):
+    """The Wi-Fi name and password, for the clock's user data (or lck wifi)."""
     from lck.userdata import UserdataFailed, check_psk, check_ssid
-    ctx.ui.say("The clock needs a Wi-Fi network to come back on after the flash. The tool adds yours to its user "
-               "data. The password is kept only in the work folder's images, like a backup's own, and never logged.")
+    ctx.ui.say(why)
     while True:
         # The name stays out of the log too: logs get pasted into issues (e2e run 7).
         ssid = ctx.ui.ask("Wi-Fi name (as your phone shows it, 2.4 GHz if your router has two): ",
@@ -141,6 +144,25 @@ def ask_if_ip_changed(ctx) -> None:
             ctx.state["ip"] = answer
             return
         ctx.ui.say(f'"{answer}" isn\'t an address. It looks like four numbers with dots between them.')
+
+
+def ask_ip_or_usb(ctx) -> bool:
+    """lck wifi found no clock over Wi-Fi: its address, if it has another one, or Enter for USB. True once a
+    clock answers at the address typed."""
+    ctx.ui.say("No clock answers over Wi-Fi" + (f" at {ctx.state['ip']}" if ctx.state.get("ip") else "")
+               + ". If it's on Wi-Fi with another address, type it.")
+    ctx.ui.physical(WHERE_IP)
+    while True:
+        answer = ctx.ui.ask("Type its address, or press Enter if it's off Wi-Fi: ").strip()
+        if not answer:
+            return False
+        if not clock.valid_ip(answer):
+            ctx.ui.say(f'"{answer}" isn\'t an address. It looks like four numbers with dots between them.')
+            continue
+        ctx.state["ip"] = answer
+        if clock.is_clock(ctx):
+            return True
+        ctx.ui.say(f"No clock answers at {answer} either.")
 
 
 def check_saved_ip(ctx) -> None:

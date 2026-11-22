@@ -46,6 +46,12 @@ def _parser() -> argparse.ArgumentParser:
     common(r)
     r.add_argument("backup_dir", type=Path)
 
+    w = sub.add_parser("wifi", help="put a converted clock on another Wi-Fi network, or give it a new password")
+    common(w)
+    w.add_argument("--ip", type=_ip, help="the clock's address, if it's on Wi-Fi now")
+    w.add_argument("--usb", action="store_true",
+                   help="use USB (BROM and fastboot mode) even if the clock answers over Wi-Fi")
+
     st = sub.add_parser("status", help="show which setup steps are done")
     common(st)
 
@@ -181,6 +187,50 @@ def _restore(args) -> int:
     return 0
 
 
+WIFI_WHY = "The tool saves this network on the clock. The password is never logged."
+
+
+def _wifi(args) -> int:
+    from lck import wifi
+    from lck.system import ask_wifi
+    ctx = _context(args)
+    ctx.ui.title("Change the clock's Wi-Fi")
+    fetch(f"platform-tools-{platform_id()}", ctx)
+    ctx.state["tools"] = Tools.locate(ctx.paths.cache)
+    on_wifi = False
+    if not args.usb:
+        if not ctx.state.get("ip"):
+            ctx.state["ip"] = clock.find_on_wifi(ctx) or _saved_ip(args)
+        if ctx.state.get("ip"):
+            with ctx.ui.busy(f"Looking for the clock at {ctx.state['ip']}"):
+                on_wifi = clock.is_clock(ctx)
+        if not on_wifi:
+            from lck.system import ask_ip_or_usb
+            on_wifi = ask_ip_or_usb(ctx)
+    if on_wifi:
+        ctx.ui.say(f"The clock answers at {ctx.state['ip']}, so the tool tells it over Wi-Fi: no USB, no restart. "
+                   "If the new network doesn't work, the clock goes back to this one by itself.")
+        ssid, psk = ask_wifi(ctx, WIFI_WHY)
+        return 0 if wifi.over_wifi(ctx, ssid, psk) else 1
+    ctx.ui.say("The tool reaches the clock over USB, then: in BROM mode it reads the clock's user data "
+               f"({wifi.READ_TIME}), saves the network in it on this computer, in place of the clock's other saved "
+               "networks, and then writes it back in fastboot mode (under a minute). Nothing else on the clock "
+               "changes. It needs about 6 GB free "
+               "for a while.")
+    ssid, psk = ask_wifi(ctx, WIFI_WHY)
+    _tools(ctx)
+    wifi.over_usb(ctx, ssid, psk)
+    return 0
+
+
+def _saved_ip(args) -> str | None:
+    f = Paths(args.workdir).progress / f"{args.name}.json"
+    try:
+        return json.loads(f.read_text(encoding="utf-8")).get("ip")
+    except (OSError, ValueError):
+        return None
+
+
 def _setup(args) -> int:
     ctx = _context(args)
     ctx.dry_run = args.dry_run
@@ -240,7 +290,7 @@ def needs_sudo(args) -> bool:
     """On a Mac, the commands that reach the clock over USB run as root (sudo): macOS's own serial driver
     takes the clock in BROM mode, and only root can take it over (a tester's Mac, issue 1). Checked
     before anything is made, so the work folder never mixes files of two accounts."""
-    if sys.platform != "darwin" or args.command not in ("setup", "backup", "restore"):
+    if sys.platform != "darwin" or args.command not in ("setup", "backup", "restore", "wifi"):
         return False
     if getattr(args, "dry_run", False):
         return False
@@ -262,7 +312,7 @@ def main(argv=None) -> int:
         print(SUDO_NEEDED.format(command=" ".join(["sudo", prog, *sys.argv[1:]])), file=sys.stderr)
         return 2
     try:
-        return {"setup": _setup, "backup": _backup, "restore": _restore, "status": _status,
+        return {"setup": _setup, "backup": _backup, "restore": _restore, "wifi": _wifi, "status": _status,
                 "selfcheck": _selfcheck}[args.command](args)
     except KeyboardInterrupt:
         print("\nStopped. Run the same command again to continue where you left off.", file=sys.stderr)

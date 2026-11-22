@@ -110,40 +110,32 @@ issue](../../../issues) with the log. Step 10 of the [manual](../devices/cube/RE
 
 ## Changing the clock's Wi-Fi
 
-To move the clock to a new network, or give it a new password, tell it over adb while it's still on the old
-network. No reinstall, and no root needed.
+A new network, or a new password for the same one, without setting up again:
 
-1. On a computer on the clock's current network, open a terminal in the folder you ran the tool from. The tool
-   downloaded adb there:
-   - Windows: `.\cache\platform-tools-windows\platform-tools\adb.exe` (in PowerShell, keep the `.\` in front)
-   - Mac: `cache/platform-tools-darwin/platform-tools/adb`, with `sudo` in front, as for the tool
-   - Linux: `cache/platform-tools-linux/platform-tools/adb`
+```
+lck wifi
+```
 
-   Or use your own adb. Below, `adb` means whichever one you use.
-2. Connect, and open a shell on the clock, with the clock's current address:
+(`lck\lck wifi` on Windows, `./lck/lck wifi` on Linux, `sudo ./lck/lck wifi` on a Mac, from the folder you
+ran setup in.) It asks for the network's name and password, then picks one of two ways:
 
-   ```
-   adb connect <the clock's address>:5555
-   adb -s <the clock's address>:5555 shell
-   ```
+- **The clock is on Wi-Fi:** the tool tells it over Wi-Fi, in seconds, with no USB and no restart. If the clock
+  can't join the new network (a mistyped password, or out of range), it goes back to the one it was on by itself,
+  after about 30 seconds, and the tool says so. You may see "Wi-Fi lost" on the clock for a moment.
+- **The clock is off Wi-Fi** (the old network is gone, or its password changed): the tool uses USB, as setup does.
+  In BROM mode it reads the clock's user data (about 20 minutes), saves the new network in it on this computer,
+  and writes it back in fastboot mode (under a minute). The new network replaces the clock's other saved
+  networks: with two saved networks in range, the clock may pick either. Nothing else on the clock changes. To
+  use this way even when the clock is on Wi-Fi: `lck wifi --usb`.
 
-3. In that shell, type this with your network's name and password. Keep the single quotes: they keep spaces and
-   symbols as they are. (A password with a `'` in it needs `'\''` in place of each `'`.)
+The password is never logged. If the clock's address changes on the new network, find it in your router's list of devices, and update
+it in Home Assistant if Home Assistant loses the clock (Settings, Devices & services, Kiosk Satellite).
 
-   ```
-   am startservice -n com.google.wifisetup/.WifiSetupService -a WifiSetupService.Connect -e ssid 'NAME' -e passphrase 'PASSWORD'
-   exit
-   ```
+By hand, with the clock on Wi-Fi, the tool does this. In `adb shell` on the clock, with the single quotes kept:
 
-   For a network with no password, leave out `-e passphrase 'PASSWORD'`.
-
-The clock joins the new network within a few seconds, and gets a new address there. Find it in your router's list
-of devices. If Home Assistant loses the clock, update the address under Settings, Devices & services, Kiosk
-Satellite.
-
-If the clock doesn't turn up on the new network, the name or password was probably mistyped. Unplug it and plug it
-back in: it should go back to the old network, which stays saved, so you can try again. (This last part is
-untested. If it stays off both networks, [open an issue](../../../issues).)
+```
+am startservice -n com.google.wifisetup/.WifiSetupService -a WifiSetupService.Connect -e ssid 'NAME' -e passphrase 'PASSWORD'
+```
 
 ## Copying text from the terminal
 
