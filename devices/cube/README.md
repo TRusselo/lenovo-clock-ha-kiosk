@@ -335,7 +335,22 @@ adb shell dpm set-device-owner me.jxl.kiosk_satellite/.KioskAdminReceiver
 android.intent.category.HOME` ends with `me.jxl.kiosk_satellite/...`; the light sensor changes brightness and the
 volume keys change the volume (Lenovo's Things app handles both).
 
-## 18. `verify`: final check
+## 18. `casting-helper`: Casting Helper plugin
+
+[Casting Helper](https://gitlab.tiered.top/api/v4/projects/3/packages/generic/casting-helper/latest/casting-helper.zip)
+is a Kiosk Satellite plugin that lets phones and computers cast video and music to the clock. The tool downloads
+the newest release with its other tools. If that download fails, the step is skipped without a word.
+
+Kiosk Satellite installs a plugin only through its remote API, signed in. With root, the tool reads the secret
+Kiosk Satellite signs its logins with (`flutter.ks.secret.remote_auth` in
+`/data/data/me.jxl.kiosk_satellite/shared_prefs/FlutterSharedPreferences.xml`), signs a 10-minute token, and
+calls `setPluginsEnabled`, `installPlugin` (trusted) and `enablePlugin` on `http://<clock-ip>:2324/api/commands/`.
+No admin password is asked. If the install fails, the tool says so in one line and setup goes on: install the ZIP
+by hand in **Plugin Manager > Install from ZIP**.
+
+**Check:** Plugin Manager lists Casting Helper, switched on; a phone's cast button shows the clock.
+
+## 19. `verify`: final check
 
 **Check:** slot `_a`, channel `none-channel`, Kiosk Satellite is device owner, Cast isn't running and Lenovo's
 Things app is.
@@ -355,6 +370,12 @@ Things app is.
   `u:object_r:wifi_data_file:s0`); `e2fsck -fn`; flash it back as sparse pieces in fastboot (about 20 seconds).
   Only the new network is kept: with two saved networks in range, the clock may join either.
   **Check:** after a restart, `dumpsys wifi` shows `mWifiInfo SSID: NAME`.
+- **A fixed address** (asked after the password, in setup too; Enter keeps it automatic): the network's
+  `<IpConfiguration>` gets `IpAssignment` `STATIC`, `LinkAddress`, `LinkPrefixLength`, `GatewayAddress` and a
+  `DNSServers` string array. Over USB it goes into the user data with the network. Over Wi-Fi, Google's service
+  only does DHCP, so it joins first, then root rewrites `/data/misc/wifi/WifiConfigStore.xml` (owner 1000:1000,
+  mode 0600, `restorecon`) and the clock restarts on the fixed address.
+  **Check:** `ip -4 addr show wlan0` shows the address.
 
 ## Restore
 

@@ -131,7 +131,7 @@ class _Usb:
         monkeypatch.setattr(images, "e2fsck", lambda ctx, img, flag: (self.order.append("fsck" + flag),
                                                                       Result(fsck if flag == "-fy" else 0, ""))[1])
         monkeypatch.setattr(userdata, "exists", lambda img, path: converted)
-        monkeypatch.setattr(userdata, "set_wifi", lambda img, ssid, psk, keep_others=True: self.order.append(
+        monkeypatch.setattr(userdata, "set_wifi", lambda img, ssid, psk, keep_others=True, static=None: self.order.append(
             f"set {ssid}" + ("" if keep_others else " only")))
         monkeypatch.setattr(images, "_sparse", lambda ctx, img, name, out, limit: [Path(out) / "userdata_chunk.0"])
         monkeypatch.setattr(flash, "fbmulti", lambda ctx, pairs, title: self.order.append(

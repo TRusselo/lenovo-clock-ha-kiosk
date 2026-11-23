@@ -20,6 +20,7 @@ Every page in one place, in the order you'll need them.
        |-- volume buttons ------>  you: press each one
        |-- Google off, keyboard, Kiosk Satellite (over Wi-Fi)
        |                           you: Kiosk Satellite setup
+       |-- Casting Helper (a Kiosk Satellite plugin)
        |-- final check
        v
  3. Keep the backup zip            Home Assistant dashboard
@@ -86,7 +87,9 @@ start it.
   for the clock's small screen. Install it with HACS, then pick it in Kiosk Satellite. Its own page has the steps,
   and is where to ask about it.
 - [Time zones](TIMEZONES.md): the time zone data the tool installs, and dashboards that are an hour off.
-- [Changing the Wi-Fi](#changing-the-clocks-wi-fi): a new network or password, without setting up again.
+- [Changing the Wi-Fi](#changing-the-clocks-wi-fi): a new network or password, or a fixed address, without
+  setting up again.
+- [Casting Helper](#casting-helper): cast video and music to the clock from a phone or computer.
 - Another backup, at any time: `lck backup --name <a new name>`.
 - To go back to a backup: `lck restore`, explained under "How it works" in the [README](../README.md#how-it-works).
 
@@ -131,11 +134,32 @@ ran setup in.) It asks for the network's name and password, then picks one of tw
 The password is never logged. If the clock's address changes on the new network, find it in your router's list of devices, and update
 it in Home Assistant if Home Assistant loses the clock (Settings, Devices & services, Kiosk Satellite).
 
+### A fixed address
+
+After the password, setup and `lck wifi` both ask for a fixed address for the clock. Press Enter to let your
+router give it one (automatic), or type one: it must be free on your network, and outside the range your router
+hands out. Then the tool asks for the subnet mask, the gateway (your router) and the DNS servers, each with a
+default you keep with Enter: 255.255.255.0, this computer's own gateway when it's on the same network, and the
+gateway again for DNS. Several DNS servers go with commas between them.
+
+Over USB, and in setup, the address is saved with the network. Over Wi-Fi, the clock joins the network first
+(so a wrong password still falls back by itself), then the tool saves the address and the clock restarts on
+it, in about a minute. If it doesn't come back there, run `lck wifi --usb` and type another address, or none.
+
 By hand, with the clock on Wi-Fi, the tool does this. In `adb shell` on the clock, with the single quotes kept:
 
 ```
 am startservice -n com.google.wifisetup/.WifiSetupService -a WifiSetupService.Connect -e ssid 'NAME' -e passphrase 'PASSWORD'
 ```
+
+## Casting Helper
+
+Setup adds [Casting Helper](https://gitlab.tiered.top/api/v4/projects/3/packages/generic/casting-helper/latest/casting-helper.zip),
+a Kiosk Satellite plugin: phones and computers on the same network see the clock in their apps' cast button,
+and video and music play full screen over the dashboard. Its settings are in Kiosk Satellite, under Plugin
+Manager. The tool downloads its newest release with the other tools; if that download fails, setup goes on
+without it, without a word. If the install fails, the tool says so in one line, and you can install the ZIP it
+names yourself: Plugin Manager, Install from ZIP.
 
 ## Copying text from the terminal
 

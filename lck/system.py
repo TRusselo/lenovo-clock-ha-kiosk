@@ -109,7 +109,8 @@ ASK_WIFI_WHY = ("The clock needs a Wi-Fi network to come back on after the flash
 
 
 def ask_wifi(ctx, why: str = ASK_WIFI_WHY):
-    """The Wi-Fi name and password, for the clock's user data (or lck wifi)."""
+    """The Wi-Fi name and password, for the clock's user data (or lck wifi). Then the optional fixed address,
+    in ctx.state["wifi_static"] (None for automatic)."""
     from lck.userdata import UserdataFailed, check_psk, check_ssid
     ctx.ui.say(why)
     while True:
@@ -126,9 +127,46 @@ def ask_wifi(ctx, why: str = ASK_WIFI_WHY):
             psk = ctx.ui.ask_secret("Wi-Fi password (not shown as you type): ")
             try:
                 check_psk(psk)
+                ctx.state["wifi_static"] = ask_static_ip(ctx)
                 return ssid, psk
             except UserdataFailed as e:
                 ctx.ui.say(str(e))
+
+
+STATIC_WHY = ("The clock gets its address from your router (automatic). To give it a fixed one instead, type "
+              "it now: the address must be free on your network, outside the range your router hands out.")
+
+
+def ask_static_ip(ctx):
+    """An optional fixed address for the network typed in: a StaticIp, or None (Enter) for automatic.
+    The mask, gateway and DNS each offer a default, kept with Enter."""
+    from lck import staticip
+    from lck.staticip import StaticIp
+    ctx.ui.say(STATIC_WHY)
+
+    def ask(question, parse):
+        while True:
+            try:
+                return parse(ctx.ui.ask(question))
+            except ValueError as e:
+                ctx.ui.say(str(e))
+
+    address = ask("Fixed address for the clock, or press Enter for automatic: ",
+                  lambda a: staticip.ip(a) if a.strip() else None)
+    if address is None:
+        return None
+    prefix = ask("Subnet mask [255.255.255.0]: ", lambda a: staticip.parse_prefix(a) if a.strip() else 24)
+    suggested = staticip.default_gateway(address, prefix, staticip.pc_gateway())
+
+    def gateway(a):
+        g = staticip.ip(a) if a.strip() else suggested
+        staticip.check(StaticIp(address, prefix, g, (g,)))
+        return g
+
+    gw = ask(f"Gateway (your router) [{suggested}]: ", gateway)
+    dns = ask(f"DNS servers, with commas between [{gw}]: ",
+              lambda a: tuple(staticip.ip(d) for d in a.split(",") if d.strip()) if a.strip() else (gw,))
+    return StaticIp(address, prefix, gw, dns)
 
 
 def ask_if_ip_changed(ctx) -> None:

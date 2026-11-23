@@ -314,6 +314,7 @@ def test_steps_are_in_the_manuals_order():
     names = [s.name for s in plan.setup_steps()]
     assert names == ["prerequisites", "backup", "unlock", "images", "userdata", "misc", "flash", "connect",
                      "root", "volume-keys", "timezone", "tzdata", "degoogle", "keyboard", "kiosk-install", "kiosk-grants", "kiosk-settings",
+                     "casting-helper",
                      "verify"]
 
 
@@ -751,11 +752,11 @@ def test_links_stand_out_on_their_own_line(monkeypatch):
 
 def test_wifi_entry_is_well_formed_and_escaped():
     import xml.dom.minidom
-    from lck import userdata
+    from lck import staticip, userdata
     from xml.sax.saxutils import escape
     ents = {'"': "&quot;", "'": "&apos;"}
     entry = userdata.NETWORK.format(key=escape('"A & B"WPA_PSK', ents), ssid=escape('"A & B"', ents),
-                                    psk=escape('"p<ss>w\'rd"', ents))
+                                    psk=escape('"p<ss>w\'rd"', ents), ip=staticip.ip_block(None))
     xml.dom.minidom.parseString(userdata.EMPTY_STORE.replace("</NetworkList>", entry + "</NetworkList>").encode())
     with pytest.raises(userdata.UserdataFailed):
         userdata.check_wifi("Home", "short")
@@ -812,7 +813,7 @@ def test_mistyped_wifi_can_be_entered_again_and_only_userdata_is_rewritten(tmp_p
     monkeypatch.setattr(clock, "wait_booted", lambda ctx, **kw: None)
     monkeypatch.setattr(clock, "prop", lambda ctx, name: "_a")
     monkeypatch.setattr(system, "channel", lambda ctx: "none-channel")
-    ui = FakeUI(["wifi", "Home", "right-password", "10.0.0.9"])
+    ui = FakeUI(["wifi", "Home", "right-password", "", "10.0.0.9"])   # "": an automatic address
     c = ctx_for(tmp_path, ui=ui, wifi_ready=False, wifi_new=("Hmoe", "wrong-password"))
     system.ConnectStep().run(c)
     assert rebuilt == [("Home", "right-password")] and flashed == [1]
@@ -1004,7 +1005,7 @@ def test_the_typed_wifi_name_stays_out_of_the_log():
     # Review 2: the answer was hidden, but "Added the Wi-Fi network <name>" logged it.
     import inspect
     from lck import images
-    src = inspect.getsource(images.UserdataStep.run)
+    src = inspect.getsource(images.save_typed_wifi)
     line = next(l for l in src.splitlines() if "Added the Wi-Fi network" in l)
     assert "log=False" in line
 

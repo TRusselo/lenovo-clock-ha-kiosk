@@ -1,6 +1,6 @@
 """Turn a stock Lenovo Smart Clock (gen 1) into a degoogled Home Assistant kiosk."""
 
-__version__ = "0.1.6"
+__version__ = "0.1.7"
 
 # Where the docs live online. Change this one line if the repository moves.
 DOCS_URL = "https://github.com/TRusselo/lenovo-clock-ha-kiosk/blob/main"

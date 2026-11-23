@@ -11,6 +11,7 @@ from lck.flash import FlashStep, UnlockStep
 from lck.images import ImagesStep, MiscStep, UserdataStep, backup_dir, work
 from lck.kiosk import GrantsStep, InstallStep, SettingsStep, fetch_apk, is_device_owner
 from lck.modes import detect
+from lck.plugin import PluginStep
 from lck.root import RootStep
 from lck.runner import Tools, platform_arch, platform_id
 from lck.steps import Step
@@ -67,6 +68,8 @@ class PrerequisitesStep(Step):
         mtk.prepare(ctx)
         with ctx.ui.busy("Downloading Kiosk Satellite"):
             fetch_apk(ctx)
+        from lck import plugin
+        plugin.fetch(ctx)              # Casting Helper: a failed download is silent, and skips its step
         # A full stop before the clock is touched: is it on a Wi-Fi that works now?
         if ctx.state.get("wifi_ready") is None and not clock.converted(ctx):
             from lck.system import ask_wifi_ready
@@ -155,5 +158,5 @@ def setup_steps() -> list[Step]:
     return [
         PrerequisitesStep(), BackupStep(), UnlockStep(), ImagesStep(), UserdataStep(), MiscStep(),
         FlashStep(), ConnectStep(), RootStep(), VolumeKeysStep(), TimezoneStep(), TzdataStep(), DegoogleStep(), KeyboardStep(), InstallStep(), GrantsStep(),
-        SettingsStep(), VerifyStep(),
+        SettingsStep(), PluginStep(), VerifyStep(),
     ]

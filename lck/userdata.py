@@ -176,11 +176,7 @@ NETWORK = """<Network>
 <long name="ConnectChoiceTimeStamp" value="-1" />
 <boolean name="HasEverConnected" value="false" />
 </NetworkStatus>
-<IpConfiguration>
-<string name="IpAssignment">DHCP</string>
-<string name="ProxySettings">NONE</string>
-</IpConfiguration>
-</Network>
+{ip}</Network>
 """
 
 
@@ -212,32 +208,34 @@ def _escaped(text: str) -> str:
     return escape(f'"{text}"', {'"': "&quot;", "'": "&apos;"})
 
 
-def with_network(xml: str, ssid: str, psk: str, keep_others: bool = True) -> str:
+def with_network(xml: str, ssid: str, psk: str, keep_others: bool = True, static=None) -> str:
     """The saved-network list with one WPA2-PSK network in it. A saved network of the same name goes first,
     so a mistyped password is replaced, not kept beside the right one. keep_others=False leaves only the new
     one: Android picks freely among saved networks in range, and with two there, a clock booted onto the old
-    one, also with the new one marked as the user's choice (ConnectChoice; live, 2026-11-22)."""
+    one, also with the new one marked as the user's choice (ConnectChoice; live, 2026-11-22). static: a
+    StaticIp (lck/staticip.py) for this network, or None for an automatic (DHCP) address."""
     from xml.sax.saxutils import escape
+    from lck.staticip import ip_block
     if "</NetworkList>" not in xml:
         xml = EMPTY_STORE
     name = f'<string name="SSID">{_escaped(ssid)}</string>'
     xml = re.sub(r"<Network>.*?</Network>\n?",
                  lambda m: m.group(0) if keep_others and name not in m.group(0) else "", xml, flags=re.S)
     entry = NETWORK.format(key=escape(f'"{ssid}"WPA_PSK', {'"': "&quot;", "'": "&apos;"}),
-                           ssid=_escaped(ssid), psk=_escaped(psk))
+                           ssid=_escaped(ssid), psk=_escaped(psk), ip=ip_block(static))
     return xml.replace("</NetworkList>", entry + "</NetworkList>", 1)
 
 
-def set_wifi(img: str, ssid: str, psk: str, keep_others: bool = True) -> None:
+def set_wifi(img: str, ssid: str, psk: str, keep_others: bool = True, static=None) -> None:
     """Save one WPA2-PSK network in the copy of the user data (replacing one of the same name, or with
-    keep_others=False every other one), owners and SELinux label as stock."""
+    keep_others=False every other one), owners and SELinux label as stock. static: see with_network."""
     check_wifi(ssid, psk)
     if not exists(img, "/misc/wifi"):
         raise UserdataFailed("This user data has no /misc/wifi folder, so the tool can't add a network to it. "
                              "Set the clock up on your Wi-Fi with the Google Home app instead.")
     xml = cat(img, WIFI_STORE).decode("utf-8", "replace") or EMPTY_STORE
     with _scratch(img) as tmp:
-        put(img, tmp, WIFI_STORE, with_network(xml, ssid, psk, keep_others).encode(), 1000, 1000, 0o600, WIFI_CTX)
+        put(img, tmp, WIFI_STORE, with_network(xml, ssid, psk, keep_others, static).encode(), 1000, 1000, 0o600, WIFI_CTX)
 
 
 add_wifi = set_wifi

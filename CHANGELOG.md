@@ -2,6 +2,16 @@
 
 What changed for people converting a clock. Newest first.
 
+## 0.1.7 (2026-11-23)
+
+- **A fixed address for the clock**, if you want one. After the Wi-Fi password, setup and `lck wifi` ask for it;
+  Enter keeps it automatic. The subnet mask, gateway and DNS each have a default you keep with Enter or type over.
+  Over Wi-Fi, `lck wifi` joins first, then saves the address and restarts the clock on it.
+  [Guide](docs/GUIDE.md#a-fixed-address). Tested on a clock both ways.
+- **Casting Helper**, a Kiosk Satellite plugin for casting video and music to the clock, is added at the end of
+  setup (new step 18). It's downloaded with the other tools; if that fails, setup goes on without it. No admin
+  password is asked. [Guide](docs/GUIDE.md#casting-helper). Tested on a clock.
+
 ## 0.1.6 (2026-11-22)
 
 - **Linux: setup no longer stops at "Build slot A".** The Linux program's own debugfs crashed on any PC that has

@@ -219,11 +219,7 @@ class UserdataStep(Step):
             if r.code not in (0, 1):
                 raise ImagesFailed("The backup's user data has file system errors e2fsck can't fix.")
             userdata.inject(str(img), str(key), runner=ctx.runner)
-            if ctx.state.get("wifi_new"):
-                ssid, psk = ctx.state["wifi_new"]
-                userdata.add_wifi(str(img), ssid, psk)
-                # On screen, not in the log: logs get pasted into issues (review of the run 7 fixes).
-                ctx.ui.say(f"Added the Wi-Fi network {ssid} to the clock's user data.", log=False)
+            save_typed_wifi(ctx, img)
             with open(img, "r+b") as f:
                 f.truncate(sparse.whole_blocks(length))
             r = e2fsck(ctx, img, "-fn")
@@ -235,6 +231,21 @@ class UserdataStep(Step):
         whose = "the Wi-Fi password you typed" if ctx.state.get("wifi_new") else "your Wi-Fi password from the backup"
         ctx.ui.say(f"The user data holds {whose}: the pieces stay in "
                    f"{out}, keep that folder private.")
+
+
+def save_typed_wifi(ctx, img) -> None:
+    """The Wi-Fi typed in (if any) into the user data copy, with its fixed address (if any): the connect step
+    then looks for the clock there."""
+    if not ctx.state.get("wifi_new"):
+        return
+    ssid, psk = ctx.state["wifi_new"]
+    static = ctx.state.get("wifi_static")
+    userdata.add_wifi(str(img), ssid, psk, static=static)
+    # On screen, not in the log: logs get pasted into issues (review of the run 7 fixes).
+    ctx.ui.say(f"Added the Wi-Fi network {ssid} to the clock's user data.", log=False)
+    if static is not None:
+        ctx.state["ip"] = static.address
+        ctx.ui.say(f"The clock gets the fixed address {static.address}, gateway {static.gateway}.")
 
 
 def rebuild_userdata(ctx) -> None:

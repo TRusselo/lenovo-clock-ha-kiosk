@@ -212,10 +212,13 @@ def _wifi(args) -> int:
             from lck.system import ask_ip_or_usb
             on_wifi = ask_ip_or_usb(ctx)
     if on_wifi:
-        ctx.ui.say(f"The clock answers at {ctx.state['ip']}, so the tool tells it over Wi-Fi: no USB, no restart. "
+        ctx.ui.say(f"The clock answers at {ctx.state['ip']}, so the tool tells it over Wi-Fi: no USB, and no restart unless you give it a fixed address. "
                    "If the new network doesn't work, the clock goes back to this one by itself.")
         ssid, psk = ask_wifi(ctx, WIFI_WHY)
-        return 0 if wifi.over_wifi(ctx, ssid, psk) else 1
+        static = ctx.state.get("wifi_static")
+        if static is not None:
+            ctx.ui.say("For the fixed address, the clock restarts once it has joined the network.")
+        return 0 if wifi.over_wifi(ctx, ssid, psk, static=static) else 1
     ctx.ui.say("The tool reaches the clock over USB, then: in BROM mode it reads the clock's user data "
                f"({wifi.READ_TIME}), saves the network in it on this computer, in place of the clock's other saved "
                "networks, and then writes it back in fastboot mode (under a minute). Nothing else on the clock "
@@ -223,7 +226,7 @@ def _wifi(args) -> int:
                "for a while.")
     ssid, psk = ask_wifi(ctx, WIFI_WHY)
     _tools(ctx)
-    wifi.over_usb(ctx, ssid, psk)
+    wifi.over_usb(ctx, ssid, psk, static=ctx.state.get("wifi_static"))
     return 0
 
 
