@@ -2,6 +2,15 @@
 
 What changed for people converting a clock. Newest first.
 
+## 0.1.6 (2026-11-22)
+
+- **Linux: setup no longer stops at "Build slot A".** The Linux program's own debugfs crashed on any PC that has
+  the readline library (most desktops), so setup couldn't read the clock's images and stopped with "Neither
+  slot's system (not Android, not Android) matches the build the user data was last used with (unknown)". Every
+  Linux release up to 0.1.5 had it. It now runs debugfs with readline switched off, and the release build checks
+  for it on a system that has readline. Found on a real clock (end-to-end run 9). With an older version, starting
+  the tool as `env SS_READLINE_PATH=none ./lck/lck setup` gets past it.
+
 ## 0.1.5 (2026-11-22)
 
 - **The root step tries the boot image copy again.** Setup used to stop when copying Magisk's patched boot image

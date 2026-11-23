@@ -43,7 +43,8 @@ jobs:
             'deb http://archive.debian.org/debian-security bullseye-security main' > /etc/apt/sources.list
           rm -f /etc/apt/sources.list.d/*
           apt-get -o Acquire::Check-Valid-Until=false update   # archived suites stop being "valid"
-          apt-get install -y --no-install-recommends build-essential binutils curl xz-utils zip qemu-user ca-certificates
+          apt-get install -y --no-install-recommends build-essential binutils curl xz-utils zip qemu-user ca-certificates \
+            libreadline8   # most desktops have it: debugfs's libss loads it unless told not to (e2e run 9)
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         if: ${{ !matrix.container }}

@@ -105,6 +105,10 @@ def _selfcheck(args) -> int:
         e2fs.locate(None)
         r = subprocess.run([userdata.DEBUGFS, "-V"], capture_output=True, text=True, env=userdata.ENV)
         assert "debugfs" in (r.stdout + r.stderr), "bundled debugfs doesn't run: " + r.stdout + r.stderr
+        # -R starts debugfs's command library, which -V doesn't: where it loaded the host's libreadline, the
+        # static Linux build crashed here (e2e run 9). The release job installs libreadline to catch that.
+        r = subprocess.run([userdata.DEBUGFS, "-R", "help"], capture_output=True, text=True, env=userdata.ENV)
+        assert r.returncode == 0, f"bundled debugfs -R fails (exit {r.returncode}): " + r.stdout + r.stderr
     print("selfcheck ok")
     return 0
 

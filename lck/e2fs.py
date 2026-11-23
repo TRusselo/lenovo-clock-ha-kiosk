@@ -39,15 +39,23 @@ def bundled() -> Path | None:
     return folder if (folder / f"debugfs{exe}").exists() and (folder / f"e2fsck{exe}").exists() else None
 
 
-def _use(folder: Path) -> None:
-    exe = ".exe" if platform_id() == "windows" else ""
-    env = None
-    if platform_id() == "windows":
-        env = dict(os.environ)
+def _env(folder: Path | None = None) -> dict:
+    """The environment debugfs and e2fsck run in. SS_READLINE_PATH=none: debugfs's command library (libss)
+    dlopens the host's libreadline at start, even for -R, and the Linux release's static debugfs segfaults
+    doing that on any PC that has libreadline (e2e run 9: every read came back empty). On Windows, Cygwin's
+    DLLs sit next to its programs."""
+    env = dict(os.environ)
+    env["SS_READLINE_PATH"] = "none"
+    if folder is not None and platform_id() == "windows":
         env["PATH"] = os.pathsep.join([str(folder), env.get("PATH", "")])
         env["CYGWIN"] = "nodosfilewarning"
+    return env
+
+
+def _use(folder: Path) -> None:
+    exe = ".exe" if platform_id() == "windows" else ""
     userdata.DEBUGFS, userdata.E2FSCK = str(folder / f"debugfs{exe}"), str(folder / f"e2fsck{exe}")
-    userdata.ENV = env
+    userdata.ENV = _env(folder)
 
 
 def gather_windows(ctx, folder: Path) -> Path:
@@ -98,10 +106,7 @@ def locate(ctx) -> None:
         return
     if plat == "windows":
         debugfs, e2fsck = _windows(ctx)
-        env = dict(os.environ)
-        env["PATH"] = os.pathsep.join([str(debugfs.parent), env.get("PATH", "")])
-        env["CYGWIN"] = "nodosfilewarning"
-        userdata.DEBUGFS, userdata.E2FSCK, userdata.ENV = str(debugfs), str(e2fsck), env
+        userdata.DEBUGFS, userdata.E2FSCK, userdata.ENV = str(debugfs), str(e2fsck), _env(debugfs.parent)
         return
     search = os.pathsep.join([os.environ.get("PATH", ""), *(BREW if plat == "darwin" else []),
                               "/sbin", "/usr/sbin"])
@@ -110,4 +115,4 @@ def locate(ctx) -> None:
         how = ("Install it with Homebrew: brew install e2fsprogs. See " + doc("docs/MACOS.md") if plat == "darwin"
                else "Install the e2fsprogs package. See " + doc("docs/LINUX.md", "step 2") + ", or " + doc("docs/PYTHON.md"))
         raise E2fsMissing("debugfs and e2fsck (e2fsprogs) aren't installed. " + how + ".")
-    userdata.DEBUGFS, userdata.E2FSCK, userdata.ENV = debugfs, e2fsck, None
+    userdata.DEBUGFS, userdata.E2FSCK, userdata.ENV = debugfs, e2fsck, _env()
