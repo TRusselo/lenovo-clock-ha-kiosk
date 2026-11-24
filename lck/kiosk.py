@@ -2,15 +2,20 @@
 what it needs, make it device owner, then walk the person through its setup
 on the clock.
 
-The app's settings file is never edited or read: rewriting it drops its
-SELinux categories and the app falls back to its setup wizard, and it holds
-the Home Assistant token and the remote admin password.
+The app's settings file is never edited: rewriting it drops its SELinux
+categories and the app falls back to its setup wizard. Settings go through the
+app's remote admin instead, with a token signed the way Casting Helper's step
+signs one (lck/plugin.py), so no admin password is asked or read. The file is
+only read with root, for the mic gain and that signing secret, and its
+contents are never logged.
 """
 from __future__ import annotations
 
 import datetime
 import hashlib
 import json
+import re
+import shlex
 import time
 from pathlib import Path
 
@@ -28,6 +33,11 @@ ADMIN = f"{PKG}/.KioskAdminReceiver"
 # Signing certificate of jxlarrea's releases (also pinned by echo-dot-assist).
 KS_CERT_SHA256 = "2a77134ce11f65ba9d08bed669fdcb742a25633c5665a6135aeca30040b068fc"
 RELEASES = "https://api.github.com/repos/jxlarrea/kiosk-satellite/releases/latest"
+PREFS = f"/data/data/{PKG}/shared_prefs/FlutterSharedPreferences.xml"
+# The clock's mic chip (a TI ADC on I2C bus 1) runs at 0 dB, and Google's own processing is gone. At Kiosk
+# Satellite's default people had to stand a foot away and raise their voice; +24 dB hears normal speech
+# across a room, peaking near -20 dB (2026-11-23).
+MIC_GAIN_DB = 24
 GRANTS = [
     ["appops", "set", PKG, "REQUEST_INSTALL_PACKAGES", "allow"],
     ["appops", "set", PKG, "WRITE_SETTINGS", "allow"],
@@ -203,16 +213,55 @@ def home_app(ctx) -> str:
     return lines[-1] if lines else ""
 
 
+def _prefs(ctx) -> str:
+    # Holds the Home Assistant token and the remote admin secrets: read with root, its output never logged.
+    return adb(ctx, "shell", "su", "-c", shlex.quote(f"cat {PREFS}"), check=False, log_output=False).out
+
+
+def _mic_gain(xml: str) -> int | None:
+    m = re.search(r'name="flutter\.ks\.audio\.mic_gain_db" value="(-?\d+)"', xml)
+    return int(m.group(1)) if m else None
+
+
+def set_mic_gain(ctx) -> None:
+    """Kiosk Satellite's mic gain, through its remote admin on the clock's Wi-Fi address."""
+    from lck import plugin
+    secret = plugin._secret(ctx)
+    if not secret:
+        raise KioskError("Couldn't sign in to Kiosk Satellite to set its mic gain. Please report this, with "
+                         "the log.")
+    ip = clock.wifi_ip(ctx) or ctx.state.get("ip")
+    r = _http(ctx).patch(f"http://{ip}:{plugin.PORT}/api/settings", json={"audio.mic_gain_db": MIC_GAIN_DB},
+                         headers={"Authorization": "Bearer " + plugin.token(secret)}, timeout=30)
+    r.raise_for_status()
+    rejected = r.json().get("rejected") or []
+    if rejected:
+        raise KioskError(f"Kiosk Satellite rejected settings: {', '.join(rejected)}")
+    if _mic_gain(_prefs(ctx)) != MIC_GAIN_DB:
+        raise KioskError("Kiosk Satellite accepted the mic gain but it didn't stick. Please report this, "
+                         "with the log.")
+    ctx.ui.say(f"Kiosk Satellite's mic gain is +{MIC_GAIN_DB} dB.")
+
+
 class SettingsStep(Step):
     name = "kiosk-settings"
     title = "Set up Kiosk Satellite on the clock"
     recover = staticmethod(clock.recover_if_lost)   # lost the clock: wait, then start again
 
     def done(self, ctx) -> bool:
+        return self._home(ctx) and _mic_gain(_prefs(ctx)) == MIC_GAIN_DB
+
+    @staticmethod
+    def _home(ctx) -> bool:
         return home_app(ctx).startswith(PKG + "/")
 
     def run(self, ctx) -> None:
         clock.require_clock(ctx)
+        if not self._home(ctx):       # a clock set up before the mic gain only needs the gain
+            self._wizard(ctx)
+        set_mic_gain(ctx)
+
+    def _wizard(self, ctx) -> None:
         shell(ctx, "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1", check=False)
         ctx.ui.physical("Kiosk Satellite is open on the clock. Go through its setup pages: a name and an "
                         "admin password, your Home Assistant address and sign-in, the dashboard to show, "
@@ -220,8 +269,7 @@ class SettingsStep(Step):
                         "device, you can import it instead of filling these in. Permissions are already done by this tool, so on the last "
                         "page just press Finish. Then, in its settings:\n"
                         "  1. Turn on \"Act as the home screen\"\n"
-                        "  2. Turn on forced landscape, if the screen is sideways\n"
-                        "  3. Leave the mic gain at its default")
+                        "  2. Turn on forced landscape, if the screen is sideways")
         ip = clock.wifi_ip(ctx) or ctx.state.get("ip")
         if ip:
             # The address on a line of its own, so terminals make it clickable.
@@ -233,7 +281,7 @@ class SettingsStep(Step):
             if choose(ctx.ui, "Press Enter here once that's done, or type stop: ", "stop"):
                 raise KioskError("Stopped before Kiosk Satellite's setup was finished. Finish it on the "
                                  "clock, then run the same command again.")
-            if self.done(ctx):
+            if self._home(ctx):
                 break
             ctx.ui.say("Kiosk Satellite isn't the home screen yet. In its settings, turn on \"Act as the home "
                        "screen\", then press Enter here.")

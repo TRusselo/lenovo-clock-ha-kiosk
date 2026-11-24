@@ -2,6 +2,14 @@
 
 What changed for people converting a clock. Newest first.
 
+## 0.1.8 (2026-11-23)
+
+- **The wake word now works from across the room.** Setup sets Kiosk Satellite's mic gain to +24 dB. At its
+  default (+8 dB) you had to be about a foot away and speak up: the clock's mic chip runs at 0 dB, and the sound
+  processing Google's own app did is gone. Clocks already converted get it by running `lck setup` again (it skips
+  Kiosk Satellite's setup pages). Tested on a clock: normal speech peaks around −20 dB on Kiosk Satellite's level
+  meter, with room to spare before it distorts.
+
 ## 0.1.7 (2026-11-23)
 
 - **A fixed address for the clock**, if you want one. After the Wi-Fi password, setup and `lck wifi` ask for it;

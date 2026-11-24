@@ -18,11 +18,13 @@ class FakeRunner:
         self.default = default
         self.calls: list[list[str]] = []
         self.envs: list[dict | None] = []
+        self.log_flags: list[bool] = []
 
     def run(self, args, *, check=True, timeout=60, env=None, log_output=True, cwd=None):
         args = [str(a) for a in args]
         self.calls.append(args)
         self.envs.append(env)
+        self.log_flags.append(log_output)
         tail = tuple(args[1:])
         best = None
         for key in self.responses:

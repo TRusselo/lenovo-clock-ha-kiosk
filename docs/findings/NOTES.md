@@ -102,10 +102,23 @@ Evidence labels: **Observed** (read on a real clock or its backup), **Reported**
 - `pm hide` needs `MANAGE_USERS` and `am force-stop` can't stop persistent apps as `shell`: root is what makes
   those possible. **Observed.**
 
+## Mic (2026-11-23)
+
+- Two digital mics feed a TI ADC (register map of the TLV320ADC3101) on I2C bus 1, address 0x1b. Lenovo's
+  Things app resets and sets it up at boot ("Initializing microphone. ADC hardware reset complete.").
+  **Observed.**
+- Its digital volume is 0 dB on both channels (regs 0x53/0x54 = 0; up to +20 dB) and its AGC is off. The
+  capture path (`pcm1c`, TDM in, 2 ch, 32-bit, 48 kHz) has no gain in `mixer_paths_0.xml`. Kiosk Satellite
+  reports the platform's echo cancellation, noise suppression and AGC as unsupported. **Observed.**
+- At Kiosk Satellite's +8 dB the wake word needed the person a foot away, speaking up. Adding 12 dB in the ADC or
+  12 dB in Kiosk Satellite gave the same signal and noise (a 1 kHz tone at 10 ft), so the tool sets Kiosk
+  Satellite's gain to +24 dB and leaves the ADC alone. At +24, speech from across the room peaks around −20 dB.
+  **Observed.**
+- The mute slider is GPIO 410 (1 = muted). **Observed.**
+
 ## Open
 
 - Mute slider under Kiosk Satellite: untested.
-- Mic capture for the voice satellite: untested.
 - Whether LK falls back to slot B after three failed slot-A boots: untested.
 
 ## USB modes, seen from the computer

@@ -327,12 +327,16 @@ adb shell dpm set-device-owner me.jxl.kiosk_satellite/.KioskAdminReceiver
 1. Go through Kiosk Satellite's setup wizard on the clock or at `http://<clock-ip>:2324`, and press **Finish**.
 2. Turn on "Act as the home screen" (`home.enabled`). Without it, Android falls back to the Things launcher.
 3. Turn on Kiosk Satellite's **forced landscape** override if it comes up sideways on the clock's portrait panel.
-4. Leave the mic gain at its default: the clock keeps Google's own mic setup.
+4. Set the mic gain (Screen & Audio → Microphone settings, or `audio.mic_gain_db`) to **+24 dB**. The tool
+   does this itself, through Kiosk Satellite's remote admin. The clock's mic chip (a TI ADC on I2C bus 1, address
+   0x1b) runs at 0 dB, and Google's own sound processing is gone, so at the default (+8 dB) the wake word only
+   worked from about a foot away.
 
 **Never edit the app's settings file directly**, and never `pm clear` it.
 
 **Check:** `adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c
-android.intent.category.HOME` ends with `me.jxl.kiosk_satellite/...`; the light sensor changes brightness and the
+android.intent.category.HOME` ends with `me.jxl.kiosk_satellite/...`; Kiosk Satellite's Microphone settings
+show +24 dB; the light sensor changes brightness and the
 volume keys change the volume (Lenovo's Things app handles both).
 
 ## 18. `casting-helper`: Casting Helper plugin
