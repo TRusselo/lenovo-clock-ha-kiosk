@@ -2,6 +2,8 @@
 
 <img width="500" alt="A Lenovo Smart Clock showing its Home Assistant dashboard: the time, the date, the weather, and buttons for the room's lights, its music player and the screensaver" src="assets/images/clock-with-dashboard.jpg" />
 
+[<img src="https://github.com/user-attachments/assets/2d889b1b-d810-42e5-834c-73a92b9e0966" width="25%">](https://buymeacoffee.com/hfaumogyb)   
+
 **Turn a stock Lenovo Smart Clock (gen 1) into a degoogled Home Assistant kiosk: your dashboard on its 4" screen,
 with Music Assistant, and root.**
 
