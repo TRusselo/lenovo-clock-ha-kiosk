@@ -33,8 +33,10 @@ backup are saved in this folder too.
 
 ## 3. Install the USB drivers (once)
 
-Windows needs two drivers to talk to the clock over USB. Follow the **Windows** part of [drivers.md](drivers.md):
+Windows needs these drivers to talk to the clock over USB. Follow the **Windows** part of [drivers.md](drivers.md):
 - **UsbDk**, for BROM mode (the backup and restore);
+- on some PCs, **WinUSB** (with Zadig) for the clock's high-speed mode, `0E8D 2001`. The tool says when it's
+  needed: the backup stays at 0% without it;
 - **Google's USB driver**, attached to the clock in fastboot mode (unlocking and flashing).
 
 Everything else the tool needs comes with it, e2fsprogs included.

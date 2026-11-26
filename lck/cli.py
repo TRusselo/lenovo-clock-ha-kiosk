@@ -263,6 +263,31 @@ def _setup(args) -> int:
 
 
 def _intro(ctx) -> str:
+    """What this run will take, and where it keeps its files."""
+    return _what_it_takes(ctx) + " " + _where(ctx)
+
+
+def _where(ctx) -> str:
+    """Issue 5: a run from the folder above the one used before found nothing, and started over from step 1.
+    So the intro names the folder, and points to progress for this clock in the folder above or one below."""
+    root = Path(ctx.paths.root).resolve()
+    name = f"{ctx.state.get('progress_id', 'clock')}.json"
+    text = (f"Everything it keeps (downloads, the backup, logs and progress) goes in {root}: run lck from this "
+            "same folder next time, and it carries on where it stopped.")
+    if (root / "progress" / name).exists():
+        return text
+    try:
+        near = [root.parent, *sorted(d for d in root.iterdir() if d.is_dir())]
+    except OSError:
+        near = [root.parent]
+    for folder in near:
+        if folder != root and (folder / "progress" / name).is_file():
+            return (text + f" Earlier progress for this clock is in {folder}. To carry on from there instead, "
+                    f"stop with Ctrl-C, go to that folder (cd \"{folder}\") and run the same command.")
+    return text
+
+
+def _what_it_takes(ctx) -> str:
     """What this run will take, leaving out what's already done (e2e run 2: a seeded backup was
     still promised as 40 minutes)."""
     if ctx.state.get("ip") and clock.converted(ctx):

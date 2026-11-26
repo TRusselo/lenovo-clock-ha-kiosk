@@ -2,6 +2,25 @@
 
 What changed for people converting a clock. Newest first.
 
+## 0.1.9 (2026-11-25)
+
+Fixes from the first report of a clock converted on Windows 11 ([issue 5](https://github.com/TRusselo/lenovo-clock-ha-kiosk/issues/5)).
+
+- **A backup stuck at 0% now stops, with the fix.** mtkclient switches the clock to high-speed USB after it reads
+  the disk size, and the clock comes back as USB ID `0E8D 2001`. On some Windows PCs that ID has no driver, and
+  the backup sat at 0% with no word. Now, after about a minute and a half, the tool stops and says what to do: on
+  Windows, give `0E8D 2001` the WinUSB driver with Zadig while the clock is still stuck, then unplug it and run
+  setup again; on Linux and macOS, plug the clock into a USB 2.0 hub. [drivers.md](docs/drivers.md#if-the-backup-stops-at-0)
+- **Fastboot driver on Windows 11:** the steps now say to skip "Search automatically" and to pick **Show All
+  Devices** before **Have Disk**.
+- **The working folder:** the tool keeps everything in the folder it's run from. Setup now names that folder when
+  it starts, and points to earlier progress for the clock in the folder above or one below, so a run from the
+  wrong folder doesn't quietly start over.
+- **A second source for the unlock files:** `Cube-AVB-factory-Unlock.zip` now has an Internet Archive copy (same
+  checksum), used if its bucket is ever gone.
+- The guide says unplugging the USB cable is harmless once the clock runs Android, and that the root step needs
+  it again.
+
 ## 0.1.8 (2026-11-23)
 
 - **The wake word now works from across the room.** Setup sets Kiosk Satellite's mic gain to +24 dB. At its

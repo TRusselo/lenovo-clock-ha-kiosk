@@ -78,6 +78,11 @@ start it.
 - The [manual](../devices/cube/README.md) has the same steps as the tool, numbered the same way, each with the
   check that proves it worked. Read it to see what a step does, or to do it by hand.
 - If the tool stops, run the same command again. It carries on where it left off.
+- Run it from the same folder each time. Downloads, the backup, the logs and the progress are kept in the folder
+  you run it from: the tool names that folder when it starts, and points to earlier progress in the folder above
+  or one below.
+- Once the clock runs Android (from "the clock's address" on), the USB cable does nothing: unplugging it is
+  harmless. Keep it within reach, though: the root step needs it again, in fastboot mode, for the Magisk boot image.
 
 ## After setup
 

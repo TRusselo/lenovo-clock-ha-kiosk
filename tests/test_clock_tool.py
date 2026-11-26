@@ -1229,3 +1229,34 @@ def test_from_source_on_a_mac_the_sudo_command_is_python_m_lck(tmp_path, monkeyp
     monkeypatch.setattr(cli.sys, "executable", "/x/.venv/bin/python")
     assert cli.main(["backup", "--name", "c1", "--workdir", str(tmp_path)]) == 2
     assert "sudo /x/.venv/bin/python -m lck backup --name c1" in capsys.readouterr().err
+
+
+# --- the working folder (issue 5: a run from the folder above started over) --
+
+def test_the_intro_names_the_working_folder(tmp_path):
+    from lck import cli
+    c = ctx_for(tmp_path)
+    assert str(c.paths.root) in cli._intro(c)
+
+
+def test_the_intro_points_to_earlier_progress_in_a_nearby_folder(tmp_path):
+    from lck import cli
+    inner = tmp_path / "lck"
+    (inner / "progress").mkdir(parents=True)
+    (inner / "progress" / "clock.json").write_text('{"done": ["prerequisites"]}')
+    c = ctx_for(tmp_path)                      # run from the folder above, as in issue 5
+    assert f"Earlier progress for this clock is in {inner.resolve()}." in cli._intro(c)
+    c2 = ctx_for(inner)                        # and the other way round
+    (inner / "progress" / "clock.json").unlink()
+    (tmp_path / "progress").mkdir()
+    (tmp_path / "progress" / "clock.json").write_text('{"done": ["prerequisites"]}')
+    assert f"Earlier progress for this clock is in {tmp_path.resolve()}." in cli._intro(c2)
+
+
+def test_no_pointer_when_the_progress_is_here(tmp_path):
+    from lck import cli
+    (tmp_path / "progress").mkdir()
+    (tmp_path / "progress" / "clock.json").write_text("{}")
+    (tmp_path / "lck" / "progress").mkdir(parents=True)
+    (tmp_path / "lck" / "progress" / "clock.json").write_text("{}")
+    assert "Earlier progress" not in cli._intro(ctx_for(tmp_path))

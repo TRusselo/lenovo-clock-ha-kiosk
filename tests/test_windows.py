@@ -239,3 +239,51 @@ def test_every_run_logs_the_version_and_os():
     from lck.cli import about_this_computer
     line = about_this_computer()
     assert f"lck {__version__}" in line and "Python" in line
+
+
+# --- the high-speed reconnect (issue 5 on Windows, issue 4 on Linux) ---------
+
+STALLED = (mtk.CONNECTED + "\nDAXFlash - EMMC USER Size:  0x1d2000000\n"
+           "DAXFlash - Reconnecting to stage2 with higher speed\n")
+
+
+def test_a_stalled_reconnect_on_windows_stops_with_the_zadig_steps(tmp_path, monkeypatch):
+    # Issue 5: the clock came back as 0E8D:2001 with no Windows driver, and the backup sat at 0% for 7 minutes.
+    c, ui, log, proc, out, sleep = _follow(tmp_path, monkeypatch, [(0, Mode.BROM), (400, Mode.NONE)], STALLED)
+    with pytest.raises(mtk.ReconnectStalled) as e:
+        mtk._follow(c, proc, out, "t", sleep, 4 * 3600, ["rf a.bin"], "Hold", None)
+    msg = str(e.value)
+    assert "Zadig" in msg and "0E8D 2001" in msg and "WinUSB" in msg
+    assert msg.index("Zadig") < msg.index("unplug")       # the driver first: the device only exists now
+    assert any("usbser.inf" in l for l in log.lines)      # what Windows knows goes in the log
+
+
+def test_a_stalled_reconnect_off_windows_suggests_a_usb_2_hub(tmp_path, monkeypatch):
+    c, ui, log, proc, out, sleep = _follow(tmp_path, monkeypatch, [(0, Mode.BROM), (400, Mode.NONE)], STALLED,
+                                           platform="linux")
+    with pytest.raises(mtk.ReconnectStalled) as e:
+        mtk._follow(c, proc, out, "t", sleep, 4 * 3600, ["rf a.bin"], "Hold", None)
+    assert "USB 2.0 hub" in str(e.value)
+    assert "Zadig" not in str(e.value)
+
+
+def test_a_reconnect_that_comes_back_carries_on(tmp_path, monkeypatch):
+    c, ui, log, proc, out, sleep = _follow(tmp_path, monkeypatch, [(0, Mode.BROM), (400, Mode.NONE)],
+                                           STALLED + "DAXFlash - Connected to stage2 with higher speed\n"
+                                           "Progress: 50.0% Read\nDumped x\n", code=0)
+    assert "Dumped" in mtk._follow(c, proc, out, "t", sleep, 4 * 3600, ["rf a.bin"], "Hold", None)
+
+
+def test_the_stall_isnt_retried(tmp_path, monkeypatch):
+    # Another try can't help: the clock is held at 0E8D:2001 until the driver is there and it's unplugged.
+    monkeypatch.setattr(mtk, "_python", lambda ctx: ["python"])
+    monkeypatch.setattr(mtk, "script", lambda ctx: Path("mtk.py"))
+    monkeypatch.setattr(mtk, "release_stale", lambda *a, **k: False)
+    monkeypatch.setattr(windrivers, "check_brom_driver", lambda *a, **k: None)
+    now = [0.0]
+    monkeypatch.setattr(mtk.time, "monotonic", lambda: now[0])
+    runner = SpawnRunner([FakeProc([True] * 2000, 1, STALLED, None), FakeProc([], 0, "Dumped x", None)])
+    c = ctx_for(tmp_path, runner=runner, ui=FakeUI(), detect=lambda: [Mode.BROM], platform="win32", log=Logger())
+    with pytest.raises(mtk.ReconnectStalled):
+        mtk.run_in_brom(c, ["rf a.bin"], cwd=tmp_path, title="t", sleep=lambda s: now.__setitem__(0, now[0] + s))
+    assert len(runner.spawned) == 1

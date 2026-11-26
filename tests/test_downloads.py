@@ -261,3 +261,10 @@ def test_cygwin_entries_have_mirrors():
         assert len(e.get("mirrors", [])) >= 2, e["id"]
         for u in e["mirrors"]:
             assert u.rsplit("/", 1)[-1] == e["url"].rsplit("/", 1)[-1]
+
+
+def test_the_unlock_zip_has_a_mirror():
+    # Issue 5: one bucket was the only source; without it no new clock can be unlocked.
+    from lck.downloads import load_manifest
+    e = load_manifest()["cube-avb-unlock"]
+    assert any("web.archive.org" in m for m in e.get("mirrors", []))

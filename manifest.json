@@ -78,6 +78,9 @@
     {
       "id": "cube-avb-unlock",
       "url": "https://s3.us-east-1.wasabisys.com/filestash-buk/lenovo-cube/Cube-AVB-factory-Unlock.zip",
+      "mirrors": [
+        "https://web.archive.org/web/20261126022440id_/https://s3.us-east-1.wasabisys.com/filestash-buk/lenovo-cube/Cube-AVB-factory-Unlock.zip"
+      ],
       "sha256": "37454a42e689bd5cfa8c5c759aa2f5a052af1abc3505e29e5c93786027a3198f",
       "size": 5370378,
       "unpack": "zip",

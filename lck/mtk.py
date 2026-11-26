@@ -14,7 +14,7 @@ import re
 import time
 from pathlib import Path
 
-from lck import windrivers
+from lck import doc, windrivers
 from lck.runner import stop
 from lck.downloads import fetch
 from lck.modes import (helper_env, BROM_PROMPT, HINT_AFTER, NOTHING_HINT, PRELOADER_HINT, STARTED_AFTER, Mode,
@@ -111,6 +111,38 @@ class MtkFailed(Exception):
 
 class ForbiddenCommand(Exception):
     pass
+
+
+class ReconnectStalled(Exception):
+    """mtkclient switched the clock to high-speed USB, and it never came back: retrying can't help."""
+
+
+# After the eMMC info, mtkclient switches the clock to high-speed USB, and the clock comes back as 0e8d:2001.
+# Issue 5 (Windows): Windows had no driver for that ID (problem code 28), and the backup sat at 0% for over 7
+# minutes. Issue 4 (Linux): the kernel couldn't enumerate it on a root port (error -71). Either way mtkclient
+# waits forever, so after this long the tool stops and says what to do.
+RECONNECTING = "Reconnecting to stage2 with higher speed"
+RECONNECTED = "Connected to stage2 with higher speed"
+RECONNECT_STALL = 90
+RECONNECT_WINDOWS = (
+    "The clock switched to high-speed USB for the backup and didn't come back: Windows has no driver for it in "
+    "that mode (USB ID 0E8D 2001). Leave the clock plugged in as it is, and give it one now, while it's there:\n"
+    "  1. Download Zadig from https://zadig.akeo.ie and run it.\n"
+    "  2. Options > List All Devices, then pick the device with USB ID 0E8D 2001.\n"
+    "  3. Choose WinUSB and click Install Driver (or Replace Driver).\n"
+    "Then unplug the clock's round power plug, and run the same command again. Nothing was written to the "
+    "clock. See " + doc("docs/drivers.md", "Windows") + ".")
+RECONNECT_OTHER = (
+    "The clock switched to high-speed USB for the backup and didn't come back: this computer's USB port "
+    "couldn't take it in that mode. Unplug the clock's round power plug, plug its USB cable into a USB 2.0 hub "
+    "(or a USB 2.0 port) instead of straight into the computer, and run the same command again. Nothing was "
+    "written to the clock. See " + doc("docs/drivers.md", "If the backup stops at 0%") + ".")
+
+
+def reconnect_pending(text: str) -> bool:
+    """mtkclient's last word on the high-speed switch is that it's reconnecting, with no reply yet."""
+    at = text.rfind(RECONNECTING)
+    return at >= 0 and RECONNECTED not in text[at:]
 
 
 def assert_safe(command: str) -> None:
@@ -335,8 +367,16 @@ def _follow(ctx, proc, log: Path, title: str, sleep, timeout: float, commands, p
         _guarded(ctx, sleep, 0.25, guard)
     if proc.poll() is None and took_over:
         ctx.ui.say("Connected. Leave the clock plugged in until this finishes.")
+        stalled_since = None
         with ctx.ui.busy(title) as job:
             while proc.poll() is None:
+                if reconnect_pending(_read(log)):
+                    stalled_since = stalled_since if stalled_since is not None else time.monotonic()
+                    if time.monotonic() - stalled_since >= RECONNECT_STALL:
+                        windrivers.log_usb_devices(ctx, ctx.state.get("platform"))
+                        raise ReconnectStalled(RECONNECT_WINDOWS if windows else RECONNECT_OTHER)
+                else:
+                    stalled_since = None
                 pct = overall(log, weights or [1] * len(commands))
                 if pct is not None:
                     job.note(f"{pct:.0f}%", pct, 100)
